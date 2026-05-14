@@ -15,6 +15,6 @@
     "productName": "Spice",
     "productVersion": "0.1.0",
     "copyright": "Copyright (c) 2026 Turen Labs, Inc. All rights reserved.",
-    "comments": "Spice local dependency and supply-chain scanner."
+    "comments": "Spice local incident-pack scanner."
   }
 }

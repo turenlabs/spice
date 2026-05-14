@@ -3,7 +3,7 @@
 Spice has three scan profiles:
 
 - `project`: fast default for manifests, lockfiles, package archives, known suspicious names, startup/token paths, and dependency loader candidates.
-- `shai-hulud`: targeted host/package-cache scan for known campaign vectors, IDE residue, persistence paths, token config paths, and package caches.
+- `shai-hulud`: targeted host/package-cache scan for incident vectors, IDE residue, persistence paths, token config paths, and package caches. The internal value is kept for compatibility; the UI labels this profile "Incident sweep".
 - `deep`: broad content scan for selected paths, bounded by size filters.
 
 ## Pipeline Phases
@@ -39,7 +39,7 @@ Always scan:
 - Python `METADATA`
 - Dockerfiles
 - startup/token-sensitive paths
-- remote suspicious filenames
+- remote incident filenames
 
 Project profile scans only dependency files likely to be loaders, such as setup/install/runtime/router/token filenames. Arbitrary dependency source files stay metadata-only unless deep scan is selected.
 
@@ -89,4 +89,3 @@ Known hot paths:
 - path allocation and lowercasing during classification
 
 Current warm-cache manifest scans should stay near the `BenchmarkScanPackageManifestsWarmCache` baseline. Run the benchmark after cache or inventory changes.
-

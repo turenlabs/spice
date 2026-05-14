@@ -39,10 +39,10 @@ export function Verdict({ counts, duration, lastRun, status }: {
         </h1>
         <p className="verdict-sub">
           {status === 'scanning'
-            ? 'Looking through package lockfiles, install scripts, cached tarballs and startup files for known-bad versions, suspicious behavior, and recent drift.'
+            ? 'Looking through package lockfiles, install scripts, cached tarballs and startup files using the loaded incident packs.'
             : isClean
-              ? 'Nothing in the scanned paths matches a known compromise, unusual install behavior, or startup persistence signal.'
-              : 'Risky packages, oddly behaved install scripts, and files that look like they were planted by a compromised package.'}
+              ? 'Nothing in the scanned paths matches the loaded package, file, hash, IOC, or persistence checks.'
+              : 'Matched package versions, install scripts, hashes, IOCs, or files from loaded incident packs.'}
         </p>
         {!isClean && status !== 'scanning' && (
           <div className="pill-row">

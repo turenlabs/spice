@@ -43,7 +43,7 @@ This project should stay small, direct, and easy to audit.
 - Explain findings as "what matched" and "what to do next."
 - Do not show scan errors as findings.
 - Do not show canceled scans as completed.
-- Keep scan profiles clear: Project, Shai-Hulud vectors, Deep.
+- Keep scan profiles clear: Project scan, Incident sweep, Deep disk scan.
 - Settings should hold lower-frequency configuration and maintenance actions.
 
 ## Documentation Standards
@@ -52,4 +52,3 @@ This project should stay small, direct, and easy to audit.
 - Put subsystem details in `docs/`.
 - Keep `AGENTS.md` as an index, not a full manual.
 - Keep release-facing user docs in `README.md`, `SECURITY.md`, and `docs/RELEASE.md`.
-

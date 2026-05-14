@@ -94,9 +94,9 @@ export function devKind(kind: string) {
     case 'affected-package':
       return 'package version';
     case 'known-malware-hash':
-      return 'matched bad file';
+      return 'matched file hash';
     case 'campaign-artifact':
-      return 'suspicious file';
+      return 'incident file';
     case 'suspicious-install-hook':
       return 'install script';
     case 'ioc-string':
@@ -111,15 +111,15 @@ export function devKind(kind: string) {
 export function devReason(finding: Finding) {
   switch (finding.kind) {
     case 'affected-package':
-      return 'This dependency version was reported as compromised.';
+      return 'This dependency version appears in a loaded incident pack.';
     case 'known-malware-hash':
-      return 'This file exactly matches a known unsafe file.';
+      return 'This file exactly matches a hash from a loaded incident pack.';
     case 'campaign-artifact':
-      return 'This file has a suspicious name plus matching behavior or content.';
+      return 'This file has an incident-specific name plus matching behavior or content.';
     case 'suspicious-install-hook':
       return 'This package runs code during install.';
     case 'ioc-string':
-      return 'This file contains text seen in public reports.';
+      return 'This file contains text from a loaded incident pack.';
     case 'persistence':
       return 'This file can run code automatically after login or startup.';
     default:
@@ -133,7 +133,7 @@ export function defaultRemoteLabel() {
 
 export function progressLabel(phase: string, status: string) {
   if (phase === 'indexing' || phase === 'enumerating') return 'Indexing file tree';
-  if (phase === 'scanning') return 'Scanning and caching files';
+  if (phase === 'scanning') return 'Checking files against loaded packs';
   if (phase === 'done') return 'Scan completed';
   return status;
 }

@@ -31,7 +31,7 @@ export function FindingsTable({ actions, findings, onDelete, onIgnore, onView, s
       <div className="emptyState">
         <CheckCircle2 size={28} />
         <strong>{scanned ? 'Scan completed: nothing to review' : 'No scan has run'}</strong>
-        <span>{scanned ? 'No known bad package versions or suspicious files matched this folder.' : 'Run Scan against a project, home directory, or mounted volume.'}</span>
+        <span>{scanned ? 'No loaded detection pack matched this folder.' : 'Run Scan against a project, home directory, or mounted volume.'}</span>
       </div>
     );
   }

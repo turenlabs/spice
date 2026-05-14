@@ -49,7 +49,7 @@ export function ScanStrip({
       <div className="wizard-head">
         <div>
           <h2>Scan wizard</h2>
-          <p>Choose the scan shape, confirm the scope, then review anything Spice found.</p>
+          <p>Choose how much disk to cover. Every scan uses the loaded incident packs.</p>
         </div>
         {running ? (
           <button className="btn btn-ghost" type="button" onClick={onStopScan}>Stop</button>
@@ -146,7 +146,7 @@ export function ScanStrip({
           <CheckCircle2 size={26} />
           <div>
             <strong>{findingsCount === 0 ? 'No open findings' : `${findingsCount} open ${findingsCount === 1 ? 'finding' : 'findings'}`}</strong>
-            <span>{findingsCount === 0 ? 'Nothing matched the current checks in the selected paths.' : 'Review the matched packages, files, and install behavior.'}</span>
+            <span>{findingsCount === 0 ? 'Nothing matched the loaded detection packs in the selected paths.' : 'Review the matched packages, files, and install behavior.'}</span>
           </div>
           <button className="btn btn-primary" type="button" onClick={onCheckResults}>
             Check results
@@ -169,28 +169,28 @@ const scanProfiles: Array<{
   {
     id: 'project',
     title: 'Project scan',
-    copy: 'Fast checks for manifests, lockfiles, install hooks, startup paths, and known risky files.',
+    copy: 'Fast checks for manifests, lockfiles, install hooks, package archives, and incident artifacts.',
     planTitle: 'Project checks',
-    planCopy: 'Best default for a repo or workspace before install, build, or release.',
-    checks: ['Package versions', 'Install lifecycle scripts', 'Known campaign files', 'Local package inventory'],
+    planCopy: 'Best default for a repo or workspace before install, build, or release. Uses every loaded pack.',
+    checks: ['Affected package versions', 'Install lifecycle scripts', 'Known incident files', 'Local package inventory'],
     icon: PackageSearch,
   },
   {
     id: 'shai-hulud',
-    title: 'Shai-Hulud vectors',
-    copy: 'Targets the attack paths used by the recent npm/PyPI campaigns without broad disk content scanning.',
-    planTitle: 'Attack-vector checks',
-    planCopy: 'Looks at package caches, IDE residue, startup persistence, token configs, and campaign artifacts.',
-    checks: ['Affected npm/PyPI packages', 'Lifecycle loaders', 'gh-token-monitor persistence', 'C2 and dead-man-switch composites', '.vscode and .claude residue'],
+    title: 'Incident sweep',
+    copy: 'Targets common dependency caches, developer config, IDE residue, and persistence paths for all packs.',
+    planTitle: 'Targeted incident checks',
+    planCopy: 'Looks across npm, Python, developer tooling, startup paths, token configs, and known incident artifacts.',
+    checks: ['Affected package versions', 'Lifecycle loaders', 'Persistence paths', 'C2 and exfil composites', 'IDE and package-cache residue'],
     icon: ShieldAlert,
   },
   {
     id: 'deep',
     title: 'Deep disk scan',
-    copy: 'Broad content scan for IOC strings and hashes. Slower, useful when responding to suspected compromise.',
+    copy: 'Broad content scan for IOC strings, hashes, archives, and composite rules from all loaded packs.',
     planTitle: 'Deep checks',
     planCopy: 'Reads more file contents while still respecting Settings excludes and large-file guards.',
-    checks: ['Known malware hashes', 'IOC strings', 'Package archives', 'Startup files', 'Text files across selected paths'],
+    checks: ['Known file hashes', 'IOC strings', 'Package archives', 'Startup files', 'Text files across selected paths'],
     icon: Radar,
   },
 ];
