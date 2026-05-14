@@ -1,0 +1,8 @@
+lockfileVersion: '9.0'
+
+packages:
+  '@tanstack/react-router@1.169.5(@types/react@19.0.0)(react-dom@19.0.0)(react@19.0.0)':
+    resolution:
+      integrity: sha512-test
+    peerDependencies:
+      react: '>=18'

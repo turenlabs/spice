@@ -1,0 +1,4 @@
+# full-line comments should be ignored
+GuardRails_AI[api,postgres] == 0.10.1 ; python_version >= "3.11"  # inline comment
+
+requests==2.32.0 # benign neighbor

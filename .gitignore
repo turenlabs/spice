@@ -1,0 +1,24 @@
+.DS_Store
+
+# Local build outputs
+/dist/
+/build/bin/
+/sectools
+/sectools.test
+*.test
+*.out
+coverage.*
+
+# Frontend dependencies and generated assets
+/frontend/node_modules/
+/frontend/dist/
+/frontend/wailsjs/
+/frontend/package.json.md5
+
+# Local app data
+/data/
+
+# Logs and editor state
+*.log
+.idea/
+.vscode/

@@ -1,0 +1,6 @@
+"@tanstack/vue-router@npm:^1.169.0":
+  version: 1.169.5
+  resolution: "@tanstack/vue-router@npm:1.169.5"
+  checksum: test
+  languageName: node
+  linkType: hard

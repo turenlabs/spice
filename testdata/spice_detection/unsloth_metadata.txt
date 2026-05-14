@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: unsloth_zoo
+Version: 2026.4.8
+Summary: Utils for Unsloth
+Project-URL: repository, https://github.com/unslothai/unsloth
+Description-Content-Type: text/markdown
+
+For advanced installation instructions or if you see weird errors during installations:
+
+First try using an isolated environment via then pip install unsloth.
+
+Or, run the below in a terminal to get the optimal pip installation command.
+Finally, install bitsandbytes and check it with python -m bitsandbytes.
