@@ -2,12 +2,12 @@
 
 Spice separates scanner code from detection data.
 
-The app contains detector logic and rule evaluators. Campaign data lives in the remote `spice-detections` repository:
+The app contains detector logic and rule evaluators. Incident-pack data lives in the remote `spice-detections` repository:
 
 - affected package versions
 - IOC regexes
 - composite IOC signals
-- suspicious filenames
+- incident filenames
 - known SHA-256 and SHA-1 hashes
 
 ## Detector Interface
@@ -47,8 +47,8 @@ Cached packs are used when remote fetch fails. Detection status reports whether 
 Prefer high-signal rules:
 
 - exact affected package name and version
-- exact known malware hashes
-- campaign-specific URLs, commit strings, repo descriptions, service names, or payload filenames
+- exact known incident file hashes
+- incident-specific URLs, commit strings, repo descriptions, service names, or payload filenames
 - composite rules requiring multiple independent signals
 
 Avoid weak rules:
@@ -85,4 +85,3 @@ Add tests in the engine repo for parser/engine behavior. Add pack-specific fixtu
 False-positive fixes should tighten evidence, add composite requirements, or add benign exclusions. Do not simply remove coverage for an attack vector unless the rule type is fundamentally unsalvageable.
 
 See `SECURITY.md` for the reporting template.
-

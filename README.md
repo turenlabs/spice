@@ -1,14 +1,14 @@
 # Spice
 
-Small Wails desktop app for local supply-chain checks on macOS and Linux.
+Small Wails desktop app for local incident-pack checks on macOS and Linux.
 
 ## Disclaimer
 
-Spice is a best-effort local detection tool. It can help find known indicators, affected package versions, and suspicious artifacts covered by its current detection pack, but it does not guarantee that every compromise, variant, or future Shai-Hulud-style attack will be found. Treat a clean scan as a useful signal, not proof that a system or project is safe.
+Spice is a best-effort local detection tool. It can help find known indicators, affected package versions, and suspicious artifacts covered by its loaded detection packs, but it does not guarantee that every compromise, variant, or future supply-chain attack will be found. Treat a clean scan as a useful signal, not proof that a system or project is safe.
 
 ## What it does
 
-- Static scan of package manifests, lockfiles, remote campaign artifact names, IOC strings, malware hashes, and persistence paths.
+- Static scan of package manifests, lockfiles, remote incident artifact names, IOC strings, file hashes, and persistence paths.
 - fsnotify watcher that flags suspicious package install hook changes, known campaign artifacts, credential path changes, and `gh-token-monitor` persistence writes.
 - Detection engine abstraction so new campaigns can be shipped as remote detection packs.
 
@@ -40,11 +40,11 @@ spice update
 spice version
 ```
 
-`--no-remote` runs with only built-in checks. Without it, Spice attempts to load the remote detection pack and falls back to the cached pack when offline.
+`--no-remote` runs with only built-in checks. Without it, Spice attempts to load remote detection packs and falls back to cached packs when offline.
 
 ## Detection Engine
 
-Spice loads rules from the remote `spice-detections` repository. The local engine provides scanners and rule evaluators; package rows, IOCs, hashes, suspicious filenames, and composite IOCs live in the remote pack.
+Spice loads rules from the remote `spice-detections` repository. The local engine provides scanners and rule evaluators; package rows, IOCs, hashes, incident filenames, and composite IOCs live in remote packs.
 
 The engine interface is in [engine.go](./engine.go):
 
@@ -58,7 +58,7 @@ type Detection interface {
 }
 ```
 
-Current remote pack: `mini-shai-hulud-2026-05`.
+Remote packs currently include Shai-Hulud/Mini Shai-Hulud coverage and can be extended with other focused supply-chain incident packs.
 
 ## Local Data And Privacy
 

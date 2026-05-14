@@ -34,8 +34,8 @@ export function SettingsPanel({
       <section className="card settingsCard">
         <div className="panelHeader">
           <div>
-            <h2>Checks</h2>
-            <p>Spice updates package and file checks from the remote detection pack. Cached remote packs are used when offline.</p>
+            <h2>Detection packs</h2>
+            <p>Spice updates package, file, hash, and IOC checks from remote incident packs. Cached packs are used when offline.</p>
           </div>
           <Button onClick={onRefreshDetections} disabled={refreshBusy} icon={refreshBusy ? <Spinner /> : <RefreshCw size={16} />}>
             Refresh
@@ -46,7 +46,7 @@ export function SettingsPanel({
           <SettingRow label="Update URL" value={detectionStatus?.remoteUrl ?? defaultRemoteLabel()} mono />
           <SettingRow label="Trust guardrails" value={detectionStatus?.trustPolicy ?? 'HTTPS GitHub content pinned to turenlabs/spice-detections main'} />
           <SettingRow label="Fetch status" value={detectionFetchLabel(detectionStatus)} />
-          <SettingRow label="Check bundles" value={String(detectionStatus?.packCount ?? 0)} />
+          <SettingRow label="Loaded packs" value={String(detectionStatus?.packCount ?? 0)} />
           <SettingRow label="Last attempt" value={formatOptionalDate(detectionStatus?.lastAttemptAt)} />
           <SettingRow label="Last success" value={formatOptionalDate(detectionStatus?.lastSuccessAt)} />
           {detectionStatus?.error && <SettingRow label="Error" value={detectionStatus.error} />}
@@ -155,7 +155,7 @@ function parseDirList(value: string) {
 
 function detectionSourceLabel(source?: string) {
   if (source === 'remote') return 'Remote GitHub';
-  if (source === 'cache') return 'Cached detection pack';
+  if (source === 'cache') return 'Cached detection packs';
   if (source === 'mixed') return 'Remote plus cached files';
   if (source === 'refreshing') return 'Refreshing';
   if (source === 'none') return 'No rules loaded';
