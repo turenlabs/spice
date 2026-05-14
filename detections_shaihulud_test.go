@@ -208,6 +208,28 @@ func TestEcosystemScopedAffectedPackagesDoNotCrossMatch(t *testing.T) {
 	}
 }
 
+func TestRemotePackIdentityIsPreserved(t *testing.T) {
+	detection := NewMiniShaiHuludDetectionWithRemote(&RemoteDetectionPack{
+		ID:       "node-ipc-2026-05",
+		Campaign: "node-ipc npm compromise May 2026",
+		AffectedVersionsByEcosystem: map[string]map[string]map[string]bool{
+			"npm": {"node-ipc": {"12.0.1": true}},
+		},
+	})
+	path := filepath.Join(t.TempDir(), "package.json")
+	data := []byte(`{"dependencies":{"node-ipc":"12.0.1"}}`)
+	var findings []Finding
+	detection.ScanFile(FileContext{Path: path, Base: filepath.Base(path), Slash: filepath.ToSlash(path), Data: data}, func(finding Finding) {
+		findings = append(findings, finding)
+	})
+	if len(findings) != 1 {
+		t.Fatalf("expected one finding, got %#v", findings)
+	}
+	if findings[0].DetectionID != "node-ipc-2026-05" || findings[0].Campaign != "node-ipc npm compromise May 2026" {
+		t.Fatalf("remote pack identity was not preserved: %#v", findings[0])
+	}
+}
+
 func scanFixture(t *testing.T, fixture string) []Finding {
 	t.Helper()
 

@@ -24,6 +24,8 @@ const miniShaiHuludID = "mini-shai-hulud-2026-05"
 const miniShaiHuludCampaign = "Mini Shai-Hulud May 2026"
 
 type MiniShaiHuludDetection struct {
+	id                  string
+	campaign            string
 	affected            map[string]map[string]bool
 	affectedByEcosystem map[string]map[string]map[string]bool
 	iocs                []iocPattern
@@ -48,6 +50,8 @@ type compositeIOCPattern struct {
 
 func NewMiniShaiHuludDetection() *MiniShaiHuludDetection {
 	return &MiniShaiHuludDetection{
+		id:                  miniShaiHuludID,
+		campaign:            miniShaiHuludCampaign,
 		affected:            map[string]map[string]bool{},
 		affectedByEcosystem: map[string]map[string]map[string]bool{},
 		suspiciousFilename:  map[string]bool{},
@@ -60,6 +64,12 @@ func NewMiniShaiHuludDetectionWithRemote(pack *RemoteDetectionPack) *MiniShaiHul
 	detection := NewMiniShaiHuludDetection()
 	if pack == nil {
 		return detection
+	}
+	if pack.ID != "" {
+		detection.id = pack.ID
+	}
+	if pack.Campaign != "" {
+		detection.campaign = pack.Campaign
 	}
 	if len(pack.AffectedVersions) > 0 {
 		detection.affected = mergeVersionMaps(map[string]map[string]bool{}, pack.AffectedVersions)
@@ -98,11 +108,11 @@ func NewMiniShaiHuludDetectionWithRemote(pack *RemoteDetectionPack) *MiniShaiHul
 }
 
 func (d *MiniShaiHuludDetection) ID() string {
-	return miniShaiHuludID
+	return d.id
 }
 
 func (d *MiniShaiHuludDetection) Campaign() string {
-	return miniShaiHuludCampaign
+	return d.campaign
 }
 
 func (d *MiniShaiHuludDetection) ScanGlobal(emit EmitFinding) {

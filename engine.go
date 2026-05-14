@@ -138,8 +138,7 @@ func (s *Scanner) UseRemoteDetectionBundle(bundle *RemoteDetectionBundle) {
 	var detections []Detection
 	suspicious := map[string]bool{}
 	for _, pack := range bundle.Packs {
-		switch pack.ID {
-		case miniShaiHuludID:
+		if remotePackHasRules(pack) {
 			detections = append(detections, NewMiniShaiHuludDetectionWithRemote(pack))
 		}
 		for _, name := range pack.SuspiciousFilenames {
@@ -155,6 +154,18 @@ func (s *Scanner) UseRemoteDetectionBundle(bundle *RemoteDetectionBundle) {
 			s.ruleCacheVersion = scanEngineVersion + ":remote"
 		}
 	}
+}
+
+func remotePackHasRules(pack *RemoteDetectionPack) bool {
+	return pack != nil &&
+		(pack.ID != "" || pack.Campaign != "") &&
+		(len(pack.AffectedVersions) > 0 ||
+			len(pack.AffectedVersionsByEcosystem) > 0 ||
+			len(pack.IOCs) > 0 ||
+			len(pack.CompositeIOCs) > 0 ||
+			len(pack.SuspiciousFilenames) > 0 ||
+			len(pack.KnownSHA256) > 0 ||
+			len(pack.KnownSHA1) > 0)
 }
 
 func (s *Scanner) cacheVersion() string {
