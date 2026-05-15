@@ -1,6 +1,7 @@
 # Spice
 
-Small Wails desktop app for local incident-pack checks on macOS and Linux.
+<img width="1178" height="794" alt="spice-img" src="https://github.com/user-attachments/assets/b18023e2-eadc-406f-9aa1-0068b96cc779" />
+
 
 ## Disclaimer
 
