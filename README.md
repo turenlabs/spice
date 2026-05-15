@@ -10,10 +10,7 @@ Spice is a best-effort local detection tool. It can help find known indicators, 
 ## What it does
 
 - Static scan of package manifests, lockfiles, remote incident artifact names, IOC strings, file hashes, and persistence paths.
-- fsnotify watcher that flags suspicious package install hook changes, known campaign artifacts, credential path changes, and `gh-token-monitor` persistence writes.
 - Detection engine abstraction so new campaigns can be shipped as remote detection packs.
-
-The watcher is filesystem-based. It detects file creation/modification/removal events; it does not claim to inspect process memory or syscall-level reads.
 
 ## Run
 
@@ -86,7 +83,7 @@ Report false positives with enough context to reproduce the rule match, but do n
 - Detection pack status or pack ID if shown in the app.
 - Package name/version or a redacted file path.
 - The matched evidence with tokens, hostnames, credentials, and customer names removed.
-- Whether the result came from `spice scan`, the desktop scan, or the watcher.
+- Whether the result came from `spice scan` or the desktop scan.
 
 Security-sensitive reports should follow [SECURITY.md](./SECURITY.md). Detection-only corrections can be contributed through the remote detection pack workflow described there.
 
