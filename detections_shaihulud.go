@@ -214,7 +214,7 @@ func (d *MiniShaiHuludDetection) scanPackageJSON(file FileContext, emit EmitFind
 	if scripts, ok := data["scripts"].(map[string]any); ok {
 		for _, hook := range []string{"preinstall", "postinstall", "prepare", "install"} {
 			if val, ok := scripts[hook]; ok {
-				if sev, reason, ok := classifyInstallHook(hook, fmt.Sprint(val)); ok {
+				if sev, reason, ok := d.classifyInstallHook(hook, fmt.Sprint(val)); ok {
 					d.emit(emit, sev, "suspicious-install-hook", file.Path, fmt.Sprintf("%s script: %s (%s)", hook, val, reason), "Review this lifecycle script before running package manager commands. Treat as higher risk if it appeared unexpectedly or came from an installed package.")
 				}
 			}
@@ -860,6 +860,28 @@ func (d *MiniShaiHuludDetection) hashCandidate(base string) bool {
 		strings.HasSuffix(base, ".zip") ||
 		strings.HasSuffix(base, ".whl") ||
 		strings.HasSuffix(base, ".pyz")
+}
+
+func (d *MiniShaiHuludDetection) classifyInstallHook(hook string, command string) (string, string, bool) {
+	sev, reason, ok := classifyInstallHook(hook, command)
+	if !ok {
+		return "", "", false
+	}
+	if d.id == miniShaiHuludID {
+		return sev, reason, true
+	}
+	lowerCommand := strings.ToLower(command)
+	for name := range d.suspiciousFilename {
+		if name != "" && strings.Contains(lowerCommand, name) {
+			return sev, reason, true
+		}
+	}
+	for _, ioc := range d.iocs {
+		if ioc.re.MatchString(command) {
+			return normalizeSeverity(ioc.severity, sev), reason, true
+		}
+	}
+	return "", "", false
 }
 
 func hasSuspiciousInstallHook(path string) bool {

