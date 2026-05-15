@@ -121,6 +121,11 @@ const (
 	scanContent
 )
 
+const (
+	maxInMemoryScanBytes       int64 = 16 * 1024 * 1024
+	maxPackageArchiveScanBytes int64 = 128 * 1024 * 1024
+)
+
 func NewScannerWithOptions(index *FileIndex, progress ScanProgressFunc) *Scanner {
 	return &Scanner{
 		index:               index,
@@ -290,7 +295,7 @@ func (s *Scanner) scanFileEntryContext(ctx context.Context, entry scanFileEntry)
 	}
 	var findings []Finding
 	var data []byte
-	if entry.size <= 16*1024*1024 {
+	if entry.size <= maxInMemoryScanBytes {
 		data, _ = os.ReadFile(entry.path)
 	}
 	if err := ctx.Err(); err != nil {
@@ -337,8 +342,14 @@ func (s *Scanner) classifyScanFile(path string, size int64) scanDecision {
 func classifyScanFile(path string, size int64, suspicious map[string]bool) scanDecision {
 	base := strings.ToLower(filepath.Base(path))
 	slash := strings.ToLower(filepath.ToSlash(path))
-	if isAlwaysScanBase(base) || suspicious[base] || isStartupOrTokenPath(slash) || isPackageArchiveBase(base) {
+	if isAlwaysScanBase(base) || suspicious[base] || isStartupOrTokenPath(slash) {
 		return scanContent
+	}
+	if isPackageArchiveBase(base) {
+		if shouldScanPackageArchive(size) {
+			return scanContent
+		}
+		return scanMetadataOnly
 	}
 	if size > 8*1024*1024 {
 		return scanMetadataOnly
@@ -357,8 +368,14 @@ func classifyScanFile(path string, size int64, suspicious map[string]bool) scanD
 func classifyShaiHuludVectorFile(path string, size int64, suspicious map[string]bool) scanDecision {
 	base := strings.ToLower(filepath.Base(path))
 	slash := strings.ToLower(filepath.ToSlash(path))
-	if isAlwaysScanBase(base) || suspicious[base] || isStartupOrTokenPath(slash) || isPackageArchiveBase(base) || isShaiHuludArtifactBase(base) {
+	if isAlwaysScanBase(base) || suspicious[base] || isStartupOrTokenPath(slash) || isShaiHuludArtifactBase(base) {
 		return scanContent
+	}
+	if isPackageArchiveBase(base) {
+		if shouldScanPackageArchive(size) {
+			return scanContent
+		}
+		return scanMetadataOnly
 	}
 	if size > 16*1024*1024 {
 		return scanMetadataOnly
@@ -418,9 +435,13 @@ func shouldSkipDeepContent(path string, size int64) bool {
 		return true
 	}
 	if isPackageArchiveBase(strings.ToLower(filepath.Base(path))) {
-		return false
+		return !shouldScanPackageArchive(size)
 	}
 	return size > 64*1024*1024
+}
+
+func shouldScanPackageArchive(size int64) bool {
+	return size >= 0 && size <= maxPackageArchiveScanBytes
 }
 
 func isAlwaysScanBase(base string) bool {

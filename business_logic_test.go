@@ -93,6 +93,48 @@ func TestScannerCacheReusesSameProfileAndSeparatesProfileVersions(t *testing.T) 
 	}
 }
 
+func TestScanSkipsOversizedGenericPackageArchives(t *testing.T) {
+	dir := t.TempDir()
+	archive := filepath.Join(dir, "training-data.tar.gz")
+	file, err := os.Create(archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Truncate(maxPackageArchiveScanBytes + 1); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	index, err := OpenScanIndex(filepath.Join(dir, "scan-index.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer index.Close()
+
+	detection := &countingDetection{}
+	scanner := NewScannerWithOptions(index, nil)
+	scanner.SetProfile(ScanProfileShaiHulud)
+	scanner.detections = []Detection{detection}
+	findings, err := scanner.Scan([]string{dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detection.calls != 0 || len(findings) != 0 {
+		t.Fatalf("expected oversized generic archive to stay metadata-only, calls=%d findings=%#v", detection.calls, findings)
+	}
+
+	var indexed int
+	if err := index.db.QueryRow(`SELECT COUNT(*) FROM file_index WHERE path = ?`, archive).Scan(&indexed); err != nil {
+		t.Fatal(err)
+	}
+	if indexed != 0 {
+		t.Fatalf("expected oversized metadata-only archive not to be stored as a scanned file, got %d rows", indexed)
+	}
+}
+
 func TestPreCanceledScanStopsBeforeIndexWrites(t *testing.T) {
 	dir := t.TempDir()
 	manifest := filepath.Join(dir, "package.json")

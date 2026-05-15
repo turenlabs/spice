@@ -13,7 +13,7 @@
   "info": {
     "companyName": "Turen Labs, Inc",
     "productName": "Spice",
-    "productVersion": "0.1.1",
+    "productVersion": "0.1.2",
     "copyright": "Copyright (c) 2026 Turen Labs, Inc. All rights reserved.",
     "comments": "Spice local incident-pack scanner."
   }

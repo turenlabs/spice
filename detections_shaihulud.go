@@ -23,6 +23,12 @@ import (
 const miniShaiHuludID = "mini-shai-hulud-2026-05"
 const miniShaiHuludCampaign = "Mini Shai-Hulud May 2026"
 
+const (
+	maxArchiveMemberBytes   int64 = 8 * 1024 * 1024
+	maxArchiveExpandedBytes int64 = 64 * 1024 * 1024
+	maxArchiveMembers             = 4096
+)
+
 type MiniShaiHuludDetection struct {
 	id                  string
 	campaign            string
@@ -401,6 +407,9 @@ func (d *MiniShaiHuludDetection) scanKnownHash(file FileContext, emit EmitFindin
 	if !d.hashCandidate(file.Base) {
 		return
 	}
+	if isPackageArchiveBase(strings.ToLower(file.Base)) && fileContextSize(file) > maxPackageArchiveScanBytes {
+		return
+	}
 
 	sha256Hash := sha256.New()
 	sha1Hash := sha1.New()
@@ -428,6 +437,9 @@ func (d *MiniShaiHuludDetection) scanKnownHash(file FileContext, emit EmitFindin
 
 func (d *MiniShaiHuludDetection) scanArchive(file FileContext, emit EmitFinding) {
 	base := strings.ToLower(file.Base)
+	if fileContextSize(file) > maxPackageArchiveScanBytes {
+		return
+	}
 	switch {
 	case strings.HasSuffix(base, ".zip"), strings.HasSuffix(base, ".whl"), strings.HasSuffix(base, ".pyz"):
 		d.scanZipArchive(file, emit)
@@ -438,23 +450,45 @@ func (d *MiniShaiHuludDetection) scanArchive(file FileContext, emit EmitFinding)
 	}
 }
 
+func fileContextSize(file FileContext) int64 {
+	if file.Data != nil {
+		return int64(len(file.Data))
+	}
+	info, err := os.Stat(file.Path)
+	if err != nil {
+		return -1
+	}
+	return info.Size()
+}
+
 func (d *MiniShaiHuludDetection) scanZipArchive(file FileContext, emit EmitFinding) {
 	reader, closeFn, err := openZipReader(file)
 	if err != nil {
 		return
 	}
 	defer closeFn()
+	var expanded int64
 	for _, member := range reader.File {
-		if member.FileInfo().IsDir() || member.UncompressedSize64 > 8*1024*1024 {
+		if len(reader.File) > maxArchiveMembers {
+			return
+		}
+		if member.FileInfo().IsDir() {
 			continue
+		}
+		if member.UncompressedSize64 > uint64(maxArchiveMemberBytes) {
+			continue
+		}
+		expanded += int64(member.UncompressedSize64)
+		if expanded > maxArchiveExpandedBytes {
+			return
 		}
 		handle, err := member.Open()
 		if err != nil {
 			continue
 		}
-		data, err := io.ReadAll(io.LimitReader(handle, 8*1024*1024+1))
+		data, err := io.ReadAll(io.LimitReader(handle, maxArchiveMemberBytes+1))
 		_ = handle.Close()
-		if err != nil || len(data) > 8*1024*1024 {
+		if err != nil || int64(len(data)) > maxArchiveMemberBytes {
 			continue
 		}
 		d.scanArchiveMember(file.Path, member.Name, data, emit)
@@ -525,6 +559,8 @@ func (d *MiniShaiHuludDetection) scanTarArchive(file FileContext, emit EmitFindi
 }
 
 func (d *MiniShaiHuludDetection) scanTarReader(archivePath string, reader *tar.Reader, emit EmitFinding) {
+	var members int
+	var expanded int64
 	for {
 		header, err := reader.Next()
 		if err == io.EOF {
@@ -533,14 +569,21 @@ func (d *MiniShaiHuludDetection) scanTarReader(archivePath string, reader *tar.R
 		if err != nil {
 			return
 		}
-		if header.Typeflag != tar.TypeReg || header.Size > 8*1024*1024 {
-			if header.Size > 0 {
-				_, _ = io.CopyN(io.Discard, reader, header.Size)
+		members++
+		if members > maxArchiveMembers {
+			return
+		}
+		if header.Size > 0 {
+			expanded += header.Size
+			if expanded > maxArchiveExpandedBytes {
+				return
 			}
+		}
+		if header.Typeflag != tar.TypeReg || header.Size > maxArchiveMemberBytes {
 			continue
 		}
-		data, err := io.ReadAll(io.LimitReader(reader, 8*1024*1024+1))
-		if err != nil || len(data) > 8*1024*1024 {
+		data, err := io.ReadAll(io.LimitReader(reader, maxArchiveMemberBytes+1))
+		if err != nil || int64(len(data)) > maxArchiveMemberBytes {
 			continue
 		}
 		d.scanArchiveMember(archivePath, header.Name, data, emit)
