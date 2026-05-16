@@ -1,10 +1,11 @@
 # Scanning System
 
-Spice has three scan profiles:
+Spice has four scan profiles:
 
 - `project`: fast default for manifests, lockfiles, package archives, known suspicious names, startup/token paths, and dependency loader candidates.
 - `shai-hulud`: targeted host/package-cache scan for incident vectors, IDE residue, persistence paths, token config paths, and package caches. The internal value is kept for compatibility; the UI labels this profile "Incident sweep".
-- `deep`: broad content scan for selected paths, bounded by size filters.
+- `startup`: focused persistence scan for macOS LaunchAgents/LaunchDaemons, systemd user/system units, Linux autostart entries, shell startup files, and known token-monitor paths.
+- `deep`: broad content scan for selected paths, bounded by size filters. The default preset includes the home directory plus system startup locations outside `~`.
 
 ## Pipeline Phases
 

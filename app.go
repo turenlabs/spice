@@ -183,7 +183,8 @@ func (a *App) Scan(req ScanRequest) (ScanResult, error) {
 	defer a.scanMu.Unlock()
 
 	started := time.Now()
-	roots := normalizeRoots(req.Paths)
+	profile := scanProfileFromRequest(req.Profile, req.Deep)
+	roots := normalizeRootsForProfile(profile, req.Paths)
 	scanID := started.Format("20060102T150405.000000000")
 	parentCtx := context.Background()
 	if a.ctx != nil {
@@ -213,8 +214,8 @@ func (a *App) Scan(req ScanRequest) (ScanResult, error) {
 			runtime.EventsEmit(a.ctx, "scan:progress", progress)
 		}
 	})
-	scanner.deep = req.Deep
-	scanner.SetProfile(ScanProfile(req.Profile))
+	scanner.deep = req.Deep || profile == ScanProfileDeep
+	scanner.SetProfile(profile)
 	scanner.SetExcludedDirs(normalizePathList(req.ExcludedDirs, false))
 	if bundle := a.currentDetectionBundle(); bundle != nil {
 		scanner.UseRemoteDetectionBundle(bundle)
@@ -637,7 +638,83 @@ func (a *App) watchStatusLocked(errMsg string) WatchStatus {
 }
 
 func normalizeRoots(paths []string) []string {
-	return normalizePathList(paths, true)
+	return normalizeRootsForProfile(ScanProfileProject, paths)
+}
+
+func scanProfileFromRequest(raw string, deep bool) ScanProfile {
+	profile := ScanProfile(raw)
+	if deep {
+		return ScanProfileDeep
+	}
+	switch profile {
+	case ScanProfileProject, ScanProfileShaiHulud, ScanProfileStartup, ScanProfileDeep:
+		return profile
+	default:
+		return ScanProfileProject
+	}
+}
+
+func normalizeRootsForProfile(profile ScanProfile, paths []string) []string {
+	defaultToCurrent := profile == ScanProfileProject
+	if len(paths) == 0 && !defaultToCurrent {
+		return normalizePathList(defaultRootsForProfile(profile), false)
+	}
+	return normalizePathList(paths, defaultToCurrent)
+}
+
+func defaultRootsForProfile(profile ScanProfile) []string {
+	switch profile {
+	case ScanProfileStartup:
+		return startupScanRoots()
+	case ScanProfileShaiHulud:
+		roots := []string{
+			"~/.npm",
+			"~/.pnpm-store",
+			"~/.yarn",
+			"~/.cache/pip",
+			"~/.cache/pypoetry",
+			"~/.config/gh",
+			"~/.local/bin",
+			"~/.npmrc",
+			"~/.pypirc",
+			"~/.vscode",
+			"~/.claude",
+		}
+		return append(roots, startupScanRoots()...)
+	case ScanProfileDeep:
+		return append([]string{"~"}, systemStartupScanRoots()...)
+	default:
+		return []string{"."}
+	}
+}
+
+func startupScanRoots() []string {
+	return append(userStartupScanRoots(), systemStartupScanRoots()...)
+}
+
+func userStartupScanRoots() []string {
+	return []string{
+		"~/Library/LaunchAgents",
+		"~/.config/systemd/user",
+		"~/.config/autostart",
+		"~/.local/bin",
+		"~/.zshrc",
+		"~/.zprofile",
+		"~/.bashrc",
+		"~/.bash_profile",
+		"~/.profile",
+		"~/.config/fish/config.fish",
+	}
+}
+
+func systemStartupScanRoots() []string {
+	return []string{
+		"/Library/LaunchAgents",
+		"/Library/LaunchDaemons",
+		"/etc/systemd/user",
+		"/etc/systemd/system",
+		"/etc/xdg/autostart",
+	}
 }
 
 func normalizePathList(paths []string, defaultToCurrent bool) []string {

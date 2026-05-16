@@ -1,4 +1,4 @@
-import { CheckCircle2, FolderOpen, PackageSearch, Radar, RotateCcw, Search, ShieldAlert } from 'lucide-react';
+import { CheckCircle2, FolderOpen, PackageSearch, Power, Radar, RotateCcw, Search, ShieldAlert } from 'lucide-react';
 import type { ScanProfile, ScanProgress } from '../types';
 import { progressLabel } from '../utils';
 
@@ -185,11 +185,20 @@ const scanProfiles: Array<{
     icon: ShieldAlert,
   },
   {
+    id: 'startup',
+    title: 'Startup items',
+    copy: 'Checks login agents, systemd units, autostart entries, shell startup files, and known persistence paths.',
+    planTitle: 'Persistence checks',
+    planCopy: 'Use this before rotating credentials when a pack mentions persistence or token-monitor behavior.',
+    checks: ['macOS LaunchAgents', 'macOS LaunchDaemons', 'systemd user and system units', 'Linux autostart entries', 'Shell startup files'],
+    icon: Power,
+  },
+  {
     id: 'deep',
     title: 'Deep disk scan',
-    copy: 'Broad content scan for IOC strings, hashes, archives, and composite rules from all loaded packs.',
+    copy: 'Broad content scan for IOC strings, hashes, archives, composite rules, and system startup locations.',
     planTitle: 'Deep checks',
-    planCopy: 'Reads more file contents while still respecting Settings excludes and large-file guards.',
+    planCopy: 'Reads more file contents and includes system startup paths outside your home directory.',
     checks: ['Known file hashes', 'IOC strings', 'Package archives', 'Startup files', 'Text files across selected paths'],
     icon: Radar,
   },

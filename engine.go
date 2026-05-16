@@ -77,6 +77,7 @@ type ScanProfile string
 const (
 	ScanProfileProject   ScanProfile = "project"
 	ScanProfileShaiHulud ScanProfile = "shai-hulud"
+	ScanProfileStartup   ScanProfile = "startup"
 	ScanProfileDeep      ScanProfile = "deep"
 )
 
@@ -195,7 +196,7 @@ func (s *Scanner) SetProfile(profile ScanProfile) {
 		return
 	}
 	switch profile {
-	case ScanProfileShaiHulud, ScanProfileDeep:
+	case ScanProfileShaiHulud, ScanProfileStartup, ScanProfileDeep:
 		s.profile = profile
 	default:
 		s.profile = ScanProfileProject
@@ -337,6 +338,14 @@ func (s *Scanner) classifyScanFile(path string, size int64) scanDecision {
 			return scanMetadataOnly
 		}
 		return scanContent
+	}
+	if s != nil && s.profile == ScanProfileStartup {
+		base := strings.ToLower(filepath.Base(path))
+		slash := strings.ToLower(filepath.ToSlash(path))
+		if isStartupOrTokenPath(slash) || isShaiHuludArtifactBase(base) || s.suspiciousFilenames[base] {
+			return scanContent
+		}
+		return scanMetadataOnly
 	}
 	if s != nil && s.profile == ScanProfileShaiHulud && classifyShaiHuludVectorFile(path, size, s.suspiciousFilenames) == scanContent {
 		return scanContent
@@ -483,12 +492,23 @@ func isPackageArchiveBase(base string) bool {
 
 func isStartupOrTokenPath(slash string) bool {
 	return strings.Contains(slash, "/launchagents/") ||
+		strings.Contains(slash, "/launchdaemons/") ||
 		strings.Contains(slash, "/.config/systemd/user/") ||
+		strings.Contains(slash, "/etc/systemd/user/") ||
+		strings.Contains(slash, "/etc/systemd/system/") ||
+		strings.Contains(slash, "/.config/autostart/") ||
+		strings.Contains(slash, "/etc/xdg/autostart/") ||
 		strings.Contains(slash, "/.local/bin/gh-token-monitor.sh") ||
 		strings.HasSuffix(slash, "/.npmrc") ||
 		strings.HasSuffix(slash, "/.pypirc") ||
 		strings.HasSuffix(slash, "/.yarnrc") ||
-		strings.Contains(slash, "/.config/gh/")
+		strings.Contains(slash, "/.config/gh/") ||
+		strings.HasSuffix(slash, "/.zshrc") ||
+		strings.HasSuffix(slash, "/.zprofile") ||
+		strings.HasSuffix(slash, "/.bashrc") ||
+		strings.HasSuffix(slash, "/.bash_profile") ||
+		strings.HasSuffix(slash, "/.profile") ||
+		strings.HasSuffix(slash, "/.config/fish/config.fish")
 }
 
 func (s *Scanner) scanPriority(path string) int {

@@ -106,6 +106,63 @@ func TestDefaultSuppressionSkipsSystemVolumesDataDuplicatePath(t *testing.T) {
 	}
 }
 
+func TestStartupProfileDefaultRootsCoverUserAndSystemStartupItems(t *testing.T) {
+	roots := defaultRootsForProfile(ScanProfileStartup)
+	joined := strings.Join(roots, "\n")
+	for _, want := range []string{
+		"~/Library/LaunchAgents",
+		"/Library/LaunchDaemons",
+		"~/.config/systemd/user",
+		"/etc/systemd/system",
+		"~/.config/autostart",
+		"~/.zshrc",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("expected startup roots to include %q, got %#v", want, roots)
+		}
+	}
+}
+
+func TestDeepProfileDefaultRootsIncludeSystemStartupItems(t *testing.T) {
+	roots := defaultRootsForProfile(ScanProfileDeep)
+	joined := strings.Join(roots, "\n")
+	for _, want := range []string{"~", "/Library/LaunchAgents", "/Library/LaunchDaemons", "/etc/systemd/system"} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("expected deep roots to include %q, got %#v", want, roots)
+		}
+	}
+}
+
+func TestStartupProfileScansStartupPathsOnly(t *testing.T) {
+	dir := t.TempDir()
+	startupFile := filepath.Join(dir, "Library", "LaunchDaemons", "com.example.test.plist")
+	ordinaryFile := filepath.Join(dir, "notes.txt")
+	if err := os.MkdirAll(filepath.Dir(startupFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(startupFile, []byte(`<plist></plist>`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(ordinaryFile, []byte(`ordinary text`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	detection := &countingDetection{}
+	scanner := NewScannerWithOptions(nil, nil)
+	scanner.SetProfile(ScanProfileStartup)
+	scanner.detections = []Detection{detection}
+	findings, err := scanner.Scan([]string{dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detection.calls != 1 {
+		t.Fatalf("expected startup profile to scan only startup path, got %d detector calls", detection.calls)
+	}
+	if len(findings) != 1 || findings[0].Path != startupFile {
+		t.Fatalf("expected only startup finding, got %#v", findings)
+	}
+}
+
 func TestScannerCacheReusesSameProfileAndSeparatesProfileVersions(t *testing.T) {
 	dir := t.TempDir()
 	manifest := filepath.Join(dir, "package.json")

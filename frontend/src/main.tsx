@@ -77,8 +77,9 @@ const emptyInventory: InventoryResult = {
 const defaultSettings: AppSettings = { excludedDirs: [] };
 const defaultScanScopes: Record<ScanProfile, string> = {
   project: '~',
-  'shai-hulud': '~/.npm, ~/.pnpm-store, ~/.yarn, ~/.cache/pip, ~/.cache/pypoetry, ~/.config/gh, ~/.local/bin, ~/Library/LaunchAgents, ~/.config/systemd/user, ~/.npmrc, ~/.pypirc, ~/.vscode, ~/.claude',
-  deep: '~',
+  'shai-hulud': '~/.npm, ~/.pnpm-store, ~/.yarn, ~/.cache/pip, ~/.cache/pypoetry, ~/.config/gh, ~/.local/bin, ~/Library/LaunchAgents, ~/.config/systemd/user, ~/.config/autostart, ~/.npmrc, ~/.pypirc, ~/.vscode, ~/.claude',
+  startup: '~/Library/LaunchAgents, /Library/LaunchAgents, /Library/LaunchDaemons, ~/.config/systemd/user, /etc/systemd/user, /etc/systemd/system, ~/.config/autostart, /etc/xdg/autostart, ~/.local/bin, ~/.zshrc, ~/.bashrc, ~/.profile',
+  deep: '~, /Library/LaunchAgents, /Library/LaunchDaemons, /etc/systemd/user, /etc/systemd/system, /etc/xdg/autostart',
 };
 
 function App() {

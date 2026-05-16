@@ -33,7 +33,7 @@ build/bin/spice scan --profile project .
 Useful commands:
 
 ```bash
-spice scan [--json] [--no-remote] [--profile project|shai-hulud|deep] [path ...]
+spice scan [--json] [--no-remote] [--profile project|shai-hulud|startup|deep] [path ...]
 spice update
 spice version
 ```

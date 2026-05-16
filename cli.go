@@ -37,7 +37,7 @@ func runCLIScan(args []string) int {
 		return 2
 	}
 	if len(roots) == 0 {
-		roots = []string{"."}
+		roots = defaultRootsForProfile(profile)
 	}
 	index, err := OpenFileIndex()
 	if err != nil {
@@ -110,14 +110,14 @@ func parseScanArgs(args []string) (jsonOut bool, noRemote bool, profile ScanProf
 		case "--profile":
 			i++
 			if i >= len(args) {
-				return false, false, "", nil, fmt.Errorf("--profile requires project, shai-hulud, or deep")
+				return false, false, "", nil, fmt.Errorf("--profile requires project, shai-hulud, startup, or deep")
 			}
 			profile = ScanProfile(args[i])
-			if profile != ScanProfileProject && profile != ScanProfileShaiHulud && profile != ScanProfileDeep {
+			if profile != ScanProfileProject && profile != ScanProfileShaiHulud && profile != ScanProfileStartup && profile != ScanProfileDeep {
 				return false, false, "", nil, fmt.Errorf("unknown scan profile: %s", args[i])
 			}
 		case "-h", "--help":
-			return false, false, "", nil, fmt.Errorf("usage: spice scan [--json] [--no-remote] [--profile project|shai-hulud|deep] [path ...]")
+			return false, false, "", nil, fmt.Errorf("usage: spice scan [--json] [--no-remote] [--profile project|shai-hulud|startup|deep] [path ...]")
 		default:
 			if strings.HasPrefix(arg, "-") {
 				return false, false, "", nil, fmt.Errorf("unknown scan option: %s", arg)
@@ -205,7 +205,7 @@ func printCLIUsage() {
 	fmt.Println(`Spice
 
 Usage:
-  spice scan [--json] [--no-remote] [--profile project|shai-hulud|deep] [path ...]
+  spice scan [--json] [--no-remote] [--profile project|shai-hulud|startup|deep] [path ...]
   spice update
   spice version
 

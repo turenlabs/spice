@@ -25,7 +25,7 @@ export type AppSettings = {
   excludedDirs: string[];
 };
 
-export type ScanProfile = 'project' | 'shai-hulud' | 'deep';
+export type ScanProfile = 'project' | 'shai-hulud' | 'startup' | 'deep';
 
 export type ScanProgress = {
   current: string;

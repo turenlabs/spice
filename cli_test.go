@@ -57,6 +57,19 @@ func TestCLIVersionFallsBackToVersionFile(t *testing.T) {
 	}
 }
 
+func TestParseScanArgsAcceptsStartupProfile(t *testing.T) {
+	_, _, profile, roots, err := parseScanArgs([]string{"--profile", "startup"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile != ScanProfileStartup {
+		t.Fatalf("profile = %q, want %q", profile, ScanProfileStartup)
+	}
+	if len(roots) != 0 {
+		t.Fatalf("parseScanArgs should not inject roots, got %#v", roots)
+	}
+}
+
 func withBuildMetadata(t *testing.T, version, commit string) {
 	t.Helper()
 	previousVersion := buildVersion
