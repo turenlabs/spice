@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Ban, CheckCircle2, Eye, Search, Trash2 } from 'lucide-react';
 import type { Finding, FindingAction } from '../types';
-import { devKind, devReason, devSeverityBucket, devSeverityCounts, findingKey } from '../utils';
+import { devFindingBucket, devFindingLabel, devKind, devReason, devSeverityCounts, findingKey } from '../utils';
 
 export function FindingsTable({ actions, findings, onDelete, onIgnore, onView, scanned }: {
   actions: Record<string, FindingAction>;
@@ -18,9 +18,9 @@ export function FindingsTable({ actions, findings, onDelete, onIgnore, onView, s
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return findings.filter((finding) => {
-      if (filter !== 'all' && devSeverityBucket(finding.severity) !== filter) return false;
+      if (filter !== 'all' && devFindingBucket(finding) !== filter) return false;
       if (!needle) return true;
-      return [finding.path, finding.evidence, finding.kind, finding.campaign, finding.detectionId]
+      return [finding.path, finding.evidence, finding.kind, finding.campaign, finding.detectionId, finding.confidence, finding.context]
         .join(' ')
         .toLowerCase()
         .includes(needle);
@@ -31,21 +31,21 @@ export function FindingsTable({ actions, findings, onDelete, onIgnore, onView, s
       <div className="emptyState">
         <CheckCircle2 size={28} />
         <strong>{scanned ? 'Scan completed: nothing to review' : 'No scan has run'}</strong>
-        <span>{scanned ? 'No loaded detection pack matched this folder.' : 'Run Scan against a project, home directory, or mounted volume.'}</span>
+        <span>{scanned ? 'No loaded detection pack matched the selected paths. That is not a guarantee of safety.' : 'Run Scan against a project, home directory, or mounted volume.'}</span>
       </div>
     );
   }
   return (
     <section className="issues">
       <div className="issues-head">
-        <h2 className="issues-title">Findings</h2>
-        <span className="issues-meta">{filtered.length} of {findings.length} shown · ordered by severity</span>
+        <h2 className="issues-title">Triage evidence</h2>
+        <span className="issues-meta">{filtered.length} of {findings.length} shown · exposure signals, not proof of compromise</span>
       </div>
       <div className="filter-row">
         <button className="chip" data-active={filter === 'all'} type="button" onClick={() => setFilter('all')}>All <span className="count">{findings.length}</span></button>
-        <button className="chip" data-active={filter === 'critical'} type="button" onClick={() => setFilter('critical')}><span className="sev-dot critical" /> Critical <span className="count">{counts.critical}</span></button>
-        <button className="chip" data-active={filter === 'review'} type="button" onClick={() => setFilter('review')}><span className="sev-dot review" /> Review <span className="count">{counts.review}</span></button>
-        <button className="chip" data-active={filter === 'worth'} type="button" onClick={() => setFilter('worth')}><span className="sev-dot worth" /> Worth checking <span className="count">{counts.worth}</span></button>
+        <button className="chip" data-active={filter === 'critical'} type="button" onClick={() => setFilter('critical')}><span className="sev-dot critical" /> High-confidence <span className="count">{counts.critical}</span></button>
+        <button className="chip" data-active={filter === 'review'} type="button" onClick={() => setFilter('review')}><span className="sev-dot review" /> Needs triage <span className="count">{counts.review}</span></button>
+        <button className="chip" data-active={filter === 'worth'} type="button" onClick={() => setFilter('worth')}><span className="sev-dot worth" /> Context <span className="count">{counts.worth}</span></button>
         <label className="finding-search">
           <Search size={14} />
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search package, file, path" spellCheck={false} />
@@ -54,7 +54,7 @@ export function FindingsTable({ actions, findings, onDelete, onIgnore, onView, s
       <div className="findings-grid">
         <div className="col-head">
           <span>Package / file</span>
-          <span>Finding</span>
+          <span>What matched</span>
           <span>Where</span>
           <span>Actions</span>
         </div>
@@ -62,7 +62,7 @@ export function FindingsTable({ actions, findings, onDelete, onIgnore, onView, s
           const key = findingKey(finding);
           const action = actions[key] ?? 'open';
           const open = openKey === key;
-          const bucket = devSeverityBucket(finding.severity);
+          const bucket = devFindingBucket(finding);
           const subject = findingSubject(finding);
           const where = findingWhere(finding.path);
           return (
@@ -70,7 +70,7 @@ export function FindingsTable({ actions, findings, onDelete, onIgnore, onView, s
               <button className="finding-row" data-open={open} type="button" onClick={() => setOpenKey(open ? null : key)}>
                 <span className="row-subject">
                   <span className="row-title"><i className="row-sev" data-sev={bucket} />{subject.title}</span>
-                  <span className="row-subtitle">{subject.subtitle}</span>
+                  <span className="row-subtitle">{devFindingLabel(finding)} · {subject.subtitle}</span>
                 </span>
                 <span className="row-finding">
                   <b>{devKind(finding.kind)}</b>
@@ -91,7 +91,8 @@ export function FindingsTable({ actions, findings, onDelete, onIgnore, onView, s
                   <div className="detail-body">
                     <div className="detail-desc">{devReason(finding)}</div>
                     <div className="detail-desc">{finding.remediation}</div>
-                    <div className="detail-snip" data-label="Matched text">{finding.evidence}</div>
+                    {finding.context && <div className="detail-snip" data-label="Context">{finding.context}</div>}
+                    <div className="detail-snip" data-label="Matched evidence">{finding.evidence}</div>
                     <div className="detail-actions">
                       <span className="ph">{action}</span>
                       <button className="btn btn-primary" type="button" onClick={() => onView(finding)}><Eye size={14} /> View</button>

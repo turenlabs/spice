@@ -64,6 +64,8 @@ type Finding struct {
 	DetectionID string `json:"detectionId"`
 	Campaign    string `json:"campaign"`
 	Severity    string `json:"severity"`
+	Confidence  string `json:"confidence,omitempty"`
+	Context     string `json:"context,omitempty"`
 	Kind        string `json:"kind"`
 	Path        string `json:"path"`
 	Evidence    string `json:"evidence"`

@@ -12,7 +12,8 @@ import (
 )
 
 type countingDetection struct {
-	calls int
+	calls    int
+	severity string
 }
 
 func (d *countingDetection) ID() string {
@@ -27,10 +28,14 @@ func (d *countingDetection) ScanGlobal(emit EmitFinding) {}
 
 func (d *countingDetection) ScanFile(file FileContext, emit EmitFinding) {
 	d.calls++
+	severity := d.severity
+	if severity == "" {
+		severity = "medium"
+	}
 	emit(Finding{
 		DetectionID: d.ID(),
 		Campaign:    d.Campaign(),
-		Severity:    "medium",
+		Severity:    severity,
 		Kind:        "test-scan",
 		Path:        file.Path,
 		Evidence:    "scanner business logic exercised",
@@ -40,6 +45,65 @@ func (d *countingDetection) ScanFile(file FileContext, emit EmitFinding) {
 
 func (d *countingDetection) WatchEvent(event fsnotify.Event) []WatchEvent {
 	return nil
+}
+
+func TestReferencePathFindingsAreDemotedByDefault(t *testing.T) {
+	dir := t.TempDir()
+	for _, rel := range []string{
+		filepath.Join("testdata", "package.json"),
+		filepath.Join("fixtures", "package.json"),
+	} {
+		path := filepath.Join(dir, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(`{"name":"reference-fixture"}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	detection := &countingDetection{severity: "critical"}
+	scanner := NewScannerWithOptions(nil, nil)
+	scanner.detections = []Detection{detection}
+	findings, err := scanner.Scan([]string{dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) != 2 {
+		t.Fatalf("expected fixture findings to remain visible but demoted, got %#v", findings)
+	}
+	for _, finding := range findings {
+		if finding.Severity != "low" || finding.Confidence != "reference" || finding.Context != "reference or test fixture" {
+			t.Fatalf("expected demoted reference finding, got %#v", finding)
+		}
+		if !strings.Contains(finding.Remediation, "reference or fixture") {
+			t.Fatalf("expected reference remediation guidance, got %#v", finding)
+		}
+	}
+}
+
+func TestReferencePathDemotionCoversArchiveMemberPaths(t *testing.T) {
+	finding := enrichFinding(Finding{
+		DetectionID: "test",
+		Campaign:    "test",
+		Severity:    "high",
+		Kind:        "ioc-string",
+		Path:        "/tmp/package.tgz!fixtures/setup.mjs",
+		Evidence:    "scanner business logic exercised",
+		Remediation: "test only",
+	})
+	if finding.Severity != "low" || finding.Confidence != "reference" || finding.Context != "reference or test fixture" {
+		t.Fatalf("expected archive fixture member to be demoted, got %#v", finding)
+	}
+}
+
+func TestDefaultSuppressionSkipsSystemVolumesDataDuplicatePath(t *testing.T) {
+	if !shouldSuppressDefaultPath("/System/Volumes/Data/Users/alice/project/package.json") {
+		t.Fatal("expected macOS Data volume duplicate path to be suppressed")
+	}
+	if shouldSuppressDefaultPath("/Users/alice/project/package.json") {
+		t.Fatal("expected normal user path not to be suppressed")
+	}
 }
 
 func TestScannerCacheReusesSameProfileAndSeparatesProfileVersions(t *testing.T) {
@@ -132,6 +196,46 @@ func TestScanSkipsOversizedGenericPackageArchives(t *testing.T) {
 	}
 	if indexed != 0 {
 		t.Fatalf("expected oversized metadata-only archive not to be stored as a scanned file, got %d rows", indexed)
+	}
+}
+
+func TestFindingEnrichmentDemotesReferencePathsAndCanonicalizesDataVolume(t *testing.T) {
+	finding := enrichFinding(Finding{
+		DetectionID: "mini-shai-hulud-2026-05",
+		Campaign:    "Mini Shai-Hulud May 2026",
+		Severity:    "critical",
+		Kind:        "affected-package",
+		Path:        "/System/Volumes/Data/Users/tom/project/testdata/package-lock.json",
+		Evidence:    "axios@1.14.1 in package-lock",
+		Remediation: "Remove the affected version.",
+	})
+
+	if finding.Path != "/Users/tom/project/testdata/package-lock.json" {
+		t.Fatalf("expected data volume path to be canonicalized, got %q", finding.Path)
+	}
+	if finding.Severity != "low" || finding.Confidence != "reference" || finding.Context != "reference or test fixture" {
+		t.Fatalf("expected reference path to be demoted, got severity=%q confidence=%q context=%q", finding.Severity, finding.Confidence, finding.Context)
+	}
+	if !strings.Contains(finding.Remediation, "reference or fixture") {
+		t.Fatalf("expected remediation to mention reference context, got %q", finding.Remediation)
+	}
+}
+
+func TestFindingEnrichmentKeepsConfirmedHashCriticalInFixtures(t *testing.T) {
+	finding := enrichFinding(Finding{
+		DetectionID: "mini-shai-hulud-2026-05",
+		Campaign:    "Mini Shai-Hulud May 2026",
+		Severity:    "critical",
+		Kind:        "known-malware-hash",
+		Path:        "/Users/tom/project/fixtures/payload.js",
+		Evidence:    "sha256=abc",
+	})
+
+	if finding.Severity != "critical" || finding.Confidence != "confirmed" {
+		t.Fatalf("expected confirmed hash to remain critical, got severity=%q confidence=%q", finding.Severity, finding.Confidence)
+	}
+	if finding.Context != "reference or test fixture" {
+		t.Fatalf("expected context to still mark fixture path, got %q", finding.Context)
 	}
 }
 

@@ -74,6 +74,8 @@ Findings should include:
 
 Developer-facing evidence should explain what matched and why it matters. Avoid vague labels such as "suspicious" without the concrete match.
 
+Product and developer copy should describe findings as exposure or triage evidence. Even high-confidence rules indicate a match against loaded detection data; operators still need project context before declaring compromise or deleting files.
+
 ## Adding Campaign Coverage
 
 Use the remote detection pack when possible. Change engine code only when a detection requires new parsing, archive handling, package inventory support, or composite behavior that cannot be expressed as data.

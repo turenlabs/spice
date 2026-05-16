@@ -249,6 +249,11 @@ func (s *Scanner) shouldExcludePath(path string) bool {
 	return false
 }
 
+func shouldSuppressDefaultPath(path string) bool {
+	slash := strings.ToLower(filepath.ToSlash(filepath.Clean(path)))
+	return slash == "/system/volumes/data" || strings.HasPrefix(slash, "/system/volumes/data/")
+}
+
 func (s *Scanner) scanGlobals(emit EmitFinding) {
 	for _, detection := range s.detections {
 		detection.ScanGlobal(emit)
@@ -542,6 +547,9 @@ func (s *Scanner) ScanChangedPath(path string) []Finding {
 	emit := func(finding Finding) {
 		findings = append(findings, finding)
 	}
+	if shouldSuppressDefaultPath(path) {
+		return nil
+	}
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil
@@ -555,6 +563,12 @@ func (s *Scanner) ScanChangedPath(path string) []Finding {
 	}
 	_ = filepath.WalkDir(path, func(child string, d os.DirEntry, err error) error {
 		if err != nil {
+			return nil
+		}
+		if shouldSuppressDefaultPath(child) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if s.shouldExcludePath(child) {
@@ -607,7 +621,7 @@ func (s *Scanner) emitProgress(progress ScanProgress) {
 
 func (s *Scanner) emitFinding(finding Finding) {
 	if s.finding != nil {
-		s.finding(finding)
+		s.finding(enrichFinding(finding))
 	}
 }
 
@@ -653,7 +667,8 @@ func dedupeFindings(findings []Finding) []Finding {
 	seen := map[string]bool{}
 	out := make([]Finding, 0, len(findings))
 	for _, finding := range findings {
-		key := finding.DetectionID + "\x00" + finding.Severity + "\x00" + finding.Kind + "\x00" + finding.Path + "\x00" + finding.Evidence
+		finding = enrichFinding(finding)
+		key := finding.DetectionID + "\x00" + finding.Severity + "\x00" + finding.Confidence + "\x00" + finding.Kind + "\x00" + finding.Path + "\x00" + finding.Evidence
 		if seen[key] {
 			continue
 		}
@@ -664,16 +679,105 @@ func dedupeFindings(findings []Finding) []Finding {
 }
 
 func sortFindings(findings []Finding) {
+	for i := range findings {
+		findings[i] = enrichFinding(findings[i])
+	}
 	weight := map[string]int{"critical": 0, "high": 1, "medium": 2, "low": 3}
+	confidenceWeight := map[string]int{"confirmed": 0, "likely": 1, "exposure": 2, "possible": 3, "reference": 4}
 	sort.SliceStable(findings, func(i, j int) bool {
 		left := weight[findings[i].Severity]
 		right := weight[findings[j].Severity]
 		if left != right {
 			return left < right
 		}
+		leftConfidence := confidenceWeight[findings[i].Confidence]
+		rightConfidence := confidenceWeight[findings[j].Confidence]
+		if leftConfidence != rightConfidence {
+			return leftConfidence < rightConfidence
+		}
 		if findings[i].Path != findings[j].Path {
 			return findings[i].Path < findings[j].Path
 		}
 		return findings[i].Evidence < findings[j].Evidence
 	})
+}
+
+func enrichFinding(finding Finding) Finding {
+	finding.Path = canonicalDisplayPath(finding.Path)
+	if finding.Confidence == "" {
+		finding.Confidence = defaultFindingConfidence(finding)
+	}
+	if isReferencePath(finding.Path) {
+		finding.Context = "reference or test fixture"
+		if finding.Kind != "known-malware-hash" && finding.Kind != "persistence" {
+			finding.Confidence = "reference"
+			finding.Severity = "low"
+			if finding.Remediation != "" && !strings.Contains(finding.Remediation, "reference or fixture") {
+				finding.Remediation = "This looks like a reference or fixture path. Confirm whether it is executable project code before treating it as exposure. " + finding.Remediation
+			}
+		}
+	}
+	return finding
+}
+
+func defaultFindingConfidence(finding Finding) string {
+	switch finding.Kind {
+	case "known-malware-hash", "persistence":
+		return "confirmed"
+	case "campaign-artifact":
+		return "likely"
+	case "affected-package":
+		return "exposure"
+	case "suspicious-install-hook":
+		return "possible"
+	case "ioc-string", "archive-artifact":
+		if strings.Contains(finding.Evidence, "100% match") {
+			return "likely"
+		}
+		return "possible"
+	default:
+		return "possible"
+	}
+}
+
+func canonicalDisplayPath(path string) string {
+	const dataPrefix = "/System/Volumes/Data"
+	if strings.HasPrefix(path, dataPrefix+"/Users/") {
+		return strings.TrimPrefix(path, dataPrefix)
+	}
+	return path
+}
+
+func isReferencePath(path string) bool {
+	slash := strings.ToLower(filepath.ToSlash(path))
+	parts := strings.FieldsFunc(slash, func(r rune) bool {
+		return r == '/' || r == '!'
+	})
+	for _, part := range parts {
+		switch part {
+		case "testdata", "fixture", "fixtures", "__fixtures__", "__tests__", "sample", "samples", "example", "examples", "mock", "mocks":
+			return true
+		}
+	}
+	referenceSegments := []string{
+		"/testdata/",
+		"/fixtures/",
+		"/fixture/",
+		"/test/fixtures/",
+		"/tests/fixtures/",
+		"/__tests__/",
+		"/spec/fixtures/",
+		"/sample/",
+		"/samples/",
+		"/example/",
+		"/examples/",
+		"/mock/",
+		"/mocks/",
+	}
+	for _, segment := range referenceSegments {
+		if strings.Contains(slash, segment) {
+			return true
+		}
+	}
+	return strings.Contains(slash, "/node_modules/") && (strings.Contains(slash, "/test/") || strings.Contains(slash, "/tests/"))
 }

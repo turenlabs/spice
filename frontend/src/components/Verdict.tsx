@@ -8,7 +8,7 @@ export function Verdict({ counts, duration, lastRun, status }: {
   const isClean = total === 0;
   const eyeClass = status === 'scanning' ? 'scanning' : isClean ? 'clean' : counts.critical > 0 ? 'crit' : '';
   const dotClass = status === 'scanning' ? 'scanning' : isClean ? 'clean' : '';
-  const eyebrow = isClean ? 'LAST PASS · NOTHING WORTH WAKING YOU' : '>_ LOCAL DEPENDENCY SAFETY';
+  const eyebrow = isClean ? 'LAST SCAN · NO PACK MATCHES' : '>_ LOCAL EXPOSURE TRIAGE';
 
   return (
     <header className="verdict">
@@ -28,12 +28,12 @@ export function Verdict({ counts, duration, lastRun, status }: {
           ) : isClean ? (
             <>
               <span className="n clean">0</span>
-              <span>open. <i>Sleep.</i></span>
+              <span>matches. <i>Not a guarantee.</i></span>
             </>
           ) : (
             <>
               <span className="n">{total}</span>
-              <span>open. <i>{counts.critical + counts.review} need eyes.</i></span>
+              <span>signals. <i>{counts.critical + counts.review} need triage.</i></span>
             </>
           )}
         </h1>
@@ -42,13 +42,13 @@ export function Verdict({ counts, duration, lastRun, status }: {
             ? 'Looking through package lockfiles, install scripts, cached tarballs and startup files using the loaded incident packs.'
             : isClean
               ? 'Nothing in the scanned paths matches the loaded package, file, hash, IOC, or persistence checks.'
-              : 'Matched package versions, install scripts, hashes, IOCs, or files from loaded incident packs.'}
+              : 'Matched package versions, install scripts, hashes, IOCs, or files are triage evidence. Confirm context before treating them as compromise.'}
         </p>
         {!isClean && status !== 'scanning' && (
           <div className="pill-row">
-            <span className="pill" data-sev="critical"><i className="d" /><b>{counts.critical}</b> critical</span>
-            <span className="pill" data-sev="review"><i className="d" /><b>{counts.review}</b> need review</span>
-            <span className="pill" data-sev="worth"><i className="d" /><b>{counts.worth}</b> worth checking</span>
+            <span className="pill" data-sev="critical"><i className="d" /><b>{counts.critical}</b> high-confidence</span>
+            <span className="pill" data-sev="review"><i className="d" /><b>{counts.review}</b> need triage</span>
+            <span className="pill" data-sev="worth"><i className="d" /><b>{counts.worth}</b> context</span>
           </div>
         )}
         <div className="verdict-meta">

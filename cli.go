@@ -20,7 +20,7 @@ func runCLI(args []string) int {
 	case "update":
 		return runCLIUpdate(args[1:])
 	case "version":
-		fmt.Println("spice dev")
+		fmt.Println(cliVersionString())
 		return 0
 	case "help", "-h", "--help":
 		printCLIUsage()

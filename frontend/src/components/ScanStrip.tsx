@@ -41,7 +41,7 @@ export function ScanStrip({
   const showPercent = phase === 'scanning' || phase === 'done';
   const displayPercent = running && progress && showPercent ? Math.min(99, Math.round(progress.percent)) : done ? 100 : 0;
   const processedLabel = progress?.total ? `${progress.processed.toLocaleString()} / ${progress.total.toLocaleString()}` : progress ? progress.processed.toLocaleString() : 'not started';
-  const phaseTitle = phase === 'indexing' ? 'Indexing file tree' : phase === 'scanning' ? 'Scanning candidates' : phase === 'done' ? 'Scan complete' : 'Ready to scan';
+  const phaseTitle = phase === 'indexing' ? 'Indexing file tree' : phase === 'scanning' ? 'Checking candidates' : phase === 'done' ? 'Scan complete' : 'Ready to scan';
   const selectedProfile = scanProfiles.find((item) => item.id === scanProfile) ?? scanProfiles[0];
 
   return (
@@ -49,7 +49,7 @@ export function ScanStrip({
       <div className="wizard-head">
         <div>
           <h2>Scan wizard</h2>
-          <p>Choose how much disk to cover. Every scan uses the loaded incident packs.</p>
+          <p>Choose how much disk to cover. Results are exposure signals from the loaded incident packs.</p>
         </div>
         {running ? (
           <button className="btn btn-ghost" type="button" onClick={onStopScan}>Stop</button>
@@ -134,7 +134,7 @@ export function ScanStrip({
               <>
                 <span><b>{progress.scanned.toLocaleString()}</b> scanned</span>
                 <span><b>{progress.skipped.toLocaleString()}</b> cached</span>
-                <span><b>{progress.findings.toLocaleString()}</b> issues</span>
+                <span><b>{progress.findings.toLocaleString()}</b> matches</span>
               </>
             ) : (
               <span><b>{progress.total?.toLocaleString() ?? progress.processed.toLocaleString()}</b> files indexed</span>
@@ -145,8 +145,8 @@ export function ScanStrip({
         <div className="wizard-done">
           <CheckCircle2 size={26} />
           <div>
-            <strong>{findingsCount === 0 ? 'No open findings' : `${findingsCount} open ${findingsCount === 1 ? 'finding' : 'findings'}`}</strong>
-            <span>{findingsCount === 0 ? 'Nothing matched the loaded detection packs in the selected paths.' : 'Review the matched packages, files, and install behavior.'}</span>
+            <strong>{findingsCount === 0 ? 'No open matches' : `${findingsCount} open ${findingsCount === 1 ? 'match' : 'matches'}`}</strong>
+            <span>{findingsCount === 0 ? 'Nothing matched the loaded detection packs in the selected paths.' : 'Review the matched packages, files, and install behavior as triage evidence.'}</span>
           </div>
           <button className="btn btn-primary" type="button" onClick={onCheckResults}>
             Check results

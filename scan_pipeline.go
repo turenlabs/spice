@@ -226,6 +226,9 @@ func (p *scanPipeline) indexFiles(ctx context.Context, roots []string, findings 
 }
 
 func (p *scanPipeline) indexRootFiles(ctx context.Context, root string, writes chan<- indexWrite, emit func(path string, total int)) (indexResult, error) {
+	if shouldSuppressDefaultPath(root) {
+		return indexResult{}, nil
+	}
 	if p.scanner.shouldExcludePath(root) {
 		return indexResult{}, nil
 	}
@@ -274,6 +277,9 @@ func (p *scanPipeline) indexRootFiles(ctx context.Context, root string, writes c
 			}
 			name := entry.Name()
 			path := filepath.Join(dir, name)
+			if shouldSuppressDefaultPath(path) {
+				continue
+			}
 			if entry.IsDir() {
 				if shouldSkipDir(name) || p.scanner.shouldExcludePath(path) {
 					continue

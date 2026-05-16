@@ -66,7 +66,7 @@ export function loadFindingActions(): Record<string, FindingAction> {
 }
 
 export function findingKey(finding: Finding) {
-  return `${finding.detectionId}\0${finding.severity}\0${finding.kind}\0${finding.path}\0${finding.evidence}`;
+  return `${finding.detectionId}\0${finding.severity}\0${finding.confidence ?? ''}\0${finding.kind}\0${finding.path}\0${finding.evidence}`;
 }
 
 export function countActions(actions: Record<string, FindingAction>) {
@@ -76,15 +76,37 @@ export function countActions(actions: Record<string, FindingAction>) {
   }, { open: 0, ignored: 0, deleted: 0 });
 }
 
-export function devSeverityBucket(severity: string): 'critical' | 'review' | 'worth' {
-  if (severity === 'critical') return 'critical';
-  if (severity === 'high') return 'review';
+export function devFindingBucket(finding: Finding): 'critical' | 'review' | 'worth' {
+  if (finding.confidence === 'reference') return 'worth';
+  if (finding.confidence === 'confirmed') return 'critical';
+  if (finding.severity === 'critical') return 'critical';
+  if (finding.severity === 'high' || finding.confidence === 'likely' || finding.confidence === 'exposure') return 'review';
   return 'worth';
+}
+
+export function devSeverityBucket(severity: string): 'critical' | 'review' | 'worth' {
+  return devFindingBucket({ severity } as Finding);
+}
+
+export function devFindingLabel(finding: Finding) {
+  if (finding.confidence === 'reference') return 'Reference/test context';
+  if (finding.confidence === 'confirmed') return 'Confirmed indicator';
+  if (finding.confidence === 'likely') return 'High-confidence evidence';
+  if (finding.confidence === 'exposure') return 'Known exposure';
+  if (finding.confidence === 'possible') return 'Context signal';
+  switch (devFindingBucket(finding)) {
+    case 'critical':
+      return 'High-confidence evidence';
+    case 'review':
+      return 'Needs triage';
+    case 'worth':
+      return 'Context signal';
+  }
 }
 
 export function devSeverityCounts(findings: Finding[]) {
   return findings.reduce((counts, finding) => {
-    counts[devSeverityBucket(finding.severity)] += 1;
+    counts[devFindingBucket(finding)] += 1;
     return counts;
   }, { critical: 0, review: 0, worth: 0 });
 }
@@ -109,19 +131,22 @@ export function devKind(kind: string) {
 }
 
 export function devReason(finding: Finding) {
+  if (finding.context) {
+    return 'Reference context: this match is inside a test, fixture, sample, or documentation-like path. Confirm whether it is executable project code before treating it as exposure.';
+  }
   switch (finding.kind) {
     case 'affected-package':
-      return 'This dependency version appears in a loaded incident pack.';
+      return 'Exposure evidence: this dependency version appears in a loaded incident pack.';
     case 'known-malware-hash':
-      return 'This file exactly matches a hash from a loaded incident pack.';
+      return 'Strong evidence: this file exactly matches a hash from a loaded incident pack.';
     case 'campaign-artifact':
-      return 'This file has an incident-specific name plus matching behavior or content.';
+      return 'Triage evidence: this file has an incident-specific name plus matching behavior or content.';
     case 'suspicious-install-hook':
-      return 'This package runs code during install.';
+      return 'Exposure evidence: this package can run code during install.';
     case 'ioc-string':
-      return 'This file contains text from a loaded incident pack.';
+      return 'Context evidence: this file contains text from a loaded incident pack.';
     case 'persistence':
-      return 'This file can run code automatically after login or startup.';
+      return 'Exposure evidence: this file can run code automatically after login or startup.';
     default:
       return finding.campaign || finding.detectionId;
   }

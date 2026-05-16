@@ -348,7 +348,7 @@ function App() {
 
   async function deleteFinding(finding: Finding) {
     if (!api()) return;
-    const confirmed = window.confirm(`Delete this file from disk?\n\n${finding.path}`);
+    const confirmed = window.confirm(`Delete this file from disk? Matches are triage evidence, not proof of compromise.\n\n${finding.path}`);
     if (!confirmed) return;
     setError('');
     try {
@@ -402,14 +402,14 @@ function App() {
                 <section className="findingsIntro">
                   <div>
                     <span className="eyebrow">RESULTS · LAST SCAN</span>
-                    <h1>Findings</h1>
+                    <h1>Triage Evidence</h1>
                     <p>
-                      Review open detections separately from scan control. View files, ignore noisy matches, or delete confirmed unsafe files.
+                      Review open detections separately from scan control. Matches show exposure evidence from loaded packs, not proof of compromise.
                     </p>
                   </div>
                   <div className="findingSummary">
-                    <span><b>{openFindings.length}</b> open</span>
-                    <span><b>{counts.critical}</b> critical</span>
+                    <span><b>{openFindings.length}</b> open matches</span>
+                    <span><b>{counts.critical}</b> high-confidence</span>
                     <span><b>{scanResult ? formatDateTime(scanResult.finishedAt) : 'never'}</b> last scan</span>
                   </div>
                 </section>

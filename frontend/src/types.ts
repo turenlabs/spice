@@ -4,6 +4,8 @@ export type Finding = {
   detectionId: string;
   campaign: string;
   severity: string;
+  confidence?: string;
+  context?: string;
   kind: string;
   path: string;
   evidence: string;

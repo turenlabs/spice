@@ -56,8 +56,8 @@ export function SettingsPanel({
       <section className="card settingsCard">
         <div className="panelHeader">
           <div>
-            <h2>Issue workflow</h2>
-            <p>Your View, Ignore, and Delete choices are kept locally on this workstation between app reloads.</p>
+            <h2>Triage workflow</h2>
+            <p>Your View, Ignore, and Delete choices for matched evidence are kept locally on this workstation between app reloads.</p>
           </div>
         </div>
         <div className="settingsRows compact">
@@ -95,8 +95,8 @@ export function SettingsPanel({
       <section className="card settingsCard settingsWide">
         <div className="panelHeader">
           <div>
-            <h2>Ignored issues</h2>
-            <p>Ignored items are hidden from scan results. Restore one if you want it back in the main list.</p>
+            <h2>Ignored matches</h2>
+            <p>Ignored matches are hidden from scan results. Restore one if you want it back in the main triage list.</p>
           </div>
           <span>{ignoredFindings.length} hidden</span>
         </div>
@@ -185,8 +185,8 @@ function IgnoredFindingsTable({ findings, onRestore }: { findings: Finding[]; on
     return (
       <div className="emptyState small">
         <CheckCircle2 size={24} />
-        <strong>No ignored issues</strong>
-        <span>Ignored scan results will show up here.</span>
+        <strong>No ignored matches</strong>
+        <span>Ignored triage evidence will show up here.</span>
       </div>
     );
   }

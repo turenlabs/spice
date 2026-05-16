@@ -5,7 +5,7 @@
 
 ## Disclaimer
 
-Spice is a best-effort local detection tool. It can help find known indicators, affected package versions, and suspicious artifacts covered by its loaded detection packs, but it does not guarantee that every compromise, variant, or future supply-chain attack will be found. Treat a clean scan as a useful signal, not proof that a system or project is safe.
+Spice is a best-effort local detection tool. It can help find known indicators, affected package versions, and suspicious artifacts covered by its loaded detection packs, but results are triage evidence, not proof of compromise. It does not guarantee that every compromise, variant, or future supply-chain attack will be found. Treat a clean scan as a useful signal, not proof that a system or project is safe.
 
 ## What it does
 
@@ -75,6 +75,8 @@ The desktop app's "Clear local data" action clears scan history, cached findings
 Remote detection updates are outbound HTTPS GET requests to GitHub for `turenlabs/spice-detections`. Spice does not upload scanned files, package inventory, findings, file previews, or local paths as part of detection updates. Treat findings and previews as sensitive anyway: they can contain local paths, package names, matched strings, and occasionally snippets that look like credentials.
 
 ## False Positives
+
+Findings should be reviewed as exposure or triage evidence. A match can mean a vulnerable package version, incident-specific text, a known hash, or a file path worth investigating; confirm project context before treating it as compromise or deleting files.
 
 Report false positives with enough context to reproduce the rule match, but do not include secrets or private source files. Useful details include:
 

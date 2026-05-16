@@ -23,6 +23,7 @@ export function PreviewPane({ finding, onClose, preview }: { finding: Finding; o
             <span>{formatDateTime(preview.modified)}</span>
             {preview.truncated && <span>truncated</span>}
           </div>
+          <div className="binaryPreview">Preview the matched file as triage context. Confirm externally before deleting files.</div>
           {preview.encoding === 'base64' ? (
             <div className="binaryPreview">Binary preview shown as base64. Use external forensic tooling before deleting.</div>
           ) : (

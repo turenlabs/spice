@@ -11,6 +11,7 @@ DIST_DIR ?= dist
 CLI_PLATFORMS ?= darwin/amd64 darwin/arm64 linux/amd64 linux/arm64
 GO_BUILD_FLAGS ?= -trimpath
 GO_LDFLAGS ?= -s -w
+VERSION_LDFLAGS ?= -X main.buildVersion=$(VERSION) -X main.buildCommit=$(COMMIT)
 WAILS ?= $(shell command -v wails 2>/dev/null || printf "%s/go/bin/wails" "$(HOME)")
 
 .PHONY: help deps frontend-install frontend-build test build build-cli install install-cli dev version release-check release release-artifacts release-cli package-app checksums clean
@@ -50,7 +51,7 @@ build: test
 
 build-cli: frontend-build
 	mkdir -p build/bin
-	go build $(GO_BUILD_FLAGS) -ldflags "$(GO_LDFLAGS)" -o $(CLI_BIN) .
+	go build $(GO_BUILD_FLAGS) -ldflags "$(GO_LDFLAGS) $(VERSION_LDFLAGS)" -o $(CLI_BIN) .
 
 install: build
 	@if [[ "$$(uname -s)" != "Darwin" ]]; then \
@@ -101,7 +102,7 @@ release-cli: release-check frontend-build
 		workdir="$(DIST_DIR)/$$archive"; \
 		mkdir -p "$$workdir"; \
 		printf "Building $$archive\n"; \
-		GOOS="$$goos" GOARCH="$$goarch" go build $(GO_BUILD_FLAGS) -ldflags "$(GO_LDFLAGS)" -o "$$workdir/$(APP_NAME)" .; \
+		GOOS="$$goos" GOARCH="$$goarch" go build $(GO_BUILD_FLAGS) -ldflags "$(GO_LDFLAGS) $(VERSION_LDFLAGS)" -o "$$workdir/$(APP_NAME)" .; \
 		cp README.md SECURITY.md "$$workdir/"; \
 		tar -C "$(DIST_DIR)" -czf "$(DIST_DIR)/$$archive.tar.gz" "$$archive"; \
 		rm -rf "$$workdir"; \

@@ -67,9 +67,13 @@ Prefer:
 - "What matched"
 - "Where"
 - "What to do next"
+- "Triage evidence"
+- "Exposure signal"
 - "Checks loaded from remote/cache"
 
 Avoid unexplained security jargon in primary UI labels. Detailed technical evidence can still be present in findings and settings.
+
+Frame findings as evidence for review, not proof that a system is compromised. Use the existing finding kind, severity, evidence, and remediation fields to explain confidence and meaning without implying certainty.
 
 ## Type Sync
 
@@ -78,4 +82,3 @@ When Go Wails model structs change:
 1. run Wails build or generation so `frontend/wailsjs/go/models.ts` updates
 2. update `frontend/src/types.ts`
 3. run `npm run build`
-

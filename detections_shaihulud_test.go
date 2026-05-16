@@ -58,9 +58,9 @@ func TestSetupMJSFilenameAloneIsNotFinding(t *testing.T) {
 	}
 }
 
-func TestDeadMansSwitchIOCsAreCritical(t *testing.T) {
+func TestDeadMansSwitchFixtureFindingIsDemoted(t *testing.T) {
 	findings := scanFixture(t, "deadman-switch.js")
-	assertSeverityContains(t, findings, "critical", "ioc-string", "gh-token-monitor composite persistence wiper: 100% match")
+	assertSeverityContains(t, findings, "low", "ioc-string", "gh-token-monitor composite persistence wiper: 100% match")
 }
 
 func TestDeadMansSwitchWeakTextIsNotFinding(t *testing.T) {

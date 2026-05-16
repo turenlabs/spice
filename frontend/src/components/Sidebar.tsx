@@ -16,9 +16,9 @@ export function Sidebar({ mode, onModeChange }: {
           <HardDrive size={20} />
           <span className="side-tip">Scan</span>
         </button>
-        <button className="side-btn" data-active={mode === 'findings'} type="button" onClick={() => onModeChange('findings')} aria-label="Findings">
+        <button className="side-btn" data-active={mode === 'findings'} type="button" onClick={() => onModeChange('findings')} aria-label="Triage evidence">
           <FileWarning size={20} />
-          <span className="side-tip">Findings</span>
+          <span className="side-tip">Evidence</span>
         </button>
         <button className="side-btn" data-active={mode === 'inventory'} type="button" onClick={() => onModeChange('inventory')} aria-label="Inventory">
           <PackageSearch size={20} />
