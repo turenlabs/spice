@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Copy, FolderSearch, Search, X } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Copy, FolderSearch, LoaderCircle, Search, X } from 'lucide-react';
 import { Fragment, useEffect, useState } from 'react';
 import type { MouseEvent } from 'react';
 import type { InventoryBin, InventoryLocation, InventoryLocationsResult, InventoryRequest, InventoryResult, PackageRef } from '../types';
@@ -90,6 +90,16 @@ export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestC
     }
   };
 
+  if (loading && packages.length === 0 && total === 0) {
+    return (
+      <section className="card dataPanel inventoryLoadingPanel">
+        <LoaderCircle className="spin" size={30} />
+        <strong>Loading local inventory</strong>
+        <span>Reading the package index from local SQLite.</span>
+      </section>
+    );
+  }
+
   if (total === 0 && !request.query && request.ecosystem === 'all' && request.sourceKind === 'all') {
     return (
       <div className="emptyState">
@@ -107,7 +117,7 @@ export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestC
           <h2>Local inventory</h2>
           <p>Packages and container bases Spice has seen on this workstation.</p>
         </div>
-        <span>{total.toLocaleString()} rows</span>
+        <span>{loading ? <><LoaderCircle className="spin inlineSpin" size={13} /> Loading</> : `${total.toLocaleString()} rows`}</span>
       </div>
       <div className="inventoryTools">
         <label className="inventorySearch">
@@ -166,6 +176,12 @@ export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestC
         </button>
       </div>
       <div className="tableWrap inventoryTable">
+        {loading && packages.length > 0 ? (
+          <div className="inventoryLoadingVeil">
+            <LoaderCircle className="spin" size={18} />
+            <span>Refreshing inventory</span>
+          </div>
+        ) : null}
         <table>
           <colgroup>
             <col className="inventoryColEco" />
@@ -246,7 +262,7 @@ function InventoryDetails({ details, pkg }: { details?: LocationState; pkg: Pack
         {details?.total && details.total > details.locations.length ? <span>showing {details.locations.length} of {details.total}</span> : null}
       </div>
       {details?.loading ? (
-        <div className="inventoryLocationStatus">Loading locations...</div>
+        <div className="inventoryLocationStatus"><LoaderCircle className="spin inlineSpin" size={13} /> Loading locations...</div>
       ) : details?.error ? (
         <div className="inventoryLocationStatus">Could not load locations: {details.error}</div>
       ) : details?.locations.length ? (

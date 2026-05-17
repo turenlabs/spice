@@ -2120,6 +2120,37 @@ button {
   padding: 12px 16px;
 }
 
+.spin {
+  animation: spin 0.85s linear infinite;
+}
+
+.inlineSpin {
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.inventoryLoadingPanel {
+  align-items: center;
+  color: var(--fg-2);
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  min-height: 280px;
+  padding: 48px 16px;
+}
+
+.inventoryLoadingPanel strong {
+  color: var(--fg-0);
+  font-size: 15px;
+}
+
 .inventorySearch {
   align-items: center;
   background: var(--bg-1);
@@ -2211,6 +2242,23 @@ button {
 .inventoryTable {
   max-height: calc(100vh - 360px);
   overflow: auto;
+  position: relative;
+}
+
+.inventoryLoadingVeil {
+  align-items: center;
+  background: color-mix(in srgb, var(--bg-0) 76%, transparent);
+  border: 1px solid var(--bd-1);
+  border-radius: 8px;
+  color: var(--fg-1);
+  display: inline-flex;
+  font-size: 12px;
+  gap: 8px;
+  padding: 8px 10px;
+  position: sticky;
+  right: 12px;
+  top: 10px;
+  z-index: 2;
 }
 
 .inventoryTable table {
@@ -2386,7 +2434,9 @@ button {
 }
 
 .inventoryLocationStatus {
+  align-items: center;
   color: var(--fg-2);
+  display: flex;
   font-size: 12px;
   padding: 4px 0;
 }
