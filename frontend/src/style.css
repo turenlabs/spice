@@ -2191,6 +2191,42 @@ button {
   width: 24px;
 }
 
+.inventoryQueryHelp {
+  align-items: center;
+  border-bottom: 1px solid var(--bd-1);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 16px;
+}
+
+.inventoryQueryHelp span {
+  color: var(--fg-3);
+  font-family: "Geist Mono", monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  margin-right: 4px;
+  text-transform: uppercase;
+}
+
+.inventoryQueryHelp button {
+  background: var(--bg-2);
+  border: 1px solid var(--bd-1);
+  border-radius: 999px;
+  color: var(--fg-2);
+  cursor: pointer;
+  font-family: "Geist Mono", monospace;
+  font-size: 11px;
+  height: 26px;
+  padding: 0 9px;
+}
+
+.inventoryQueryHelp button:hover {
+  border-color: var(--accent);
+  color: var(--fg-0);
+}
+
 .inventoryPageSize {
   background: var(--bg-1);
   border: 1px solid var(--bd-1);

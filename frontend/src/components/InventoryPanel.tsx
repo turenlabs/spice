@@ -53,7 +53,13 @@ export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestC
     onRequestChange({ ...request, ...patch, skipFacets: !facets });
   };
   const resetFilters = () => {
+    setQueryDraft('');
     onRequestChange({ ...request, offset: 0, query: '', ecosystem: 'all', sourceKind: 'all', skipFacets: false });
+  };
+  const addFilterToken = (token: string) => {
+    const next = [queryDraft.trim(), token].filter(Boolean).join(' ');
+    setQueryDraft(next);
+    onRequestChange({ ...request, query: next, offset: 0, skipFacets: true });
   };
   const goPage = (direction: -1 | 1) => {
     const nextOffset = Math.max(0, Math.min(Math.max(total - limit, 0), offset + direction * limit));
@@ -125,7 +131,7 @@ export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestC
           <input
             value={queryDraft}
             onChange={(event) => setQueryDraft(event.target.value)}
-            placeholder="Search package, version, or path"
+            placeholder="Filter packages: react ecosystem:npm source:package-lock path:node_modules"
             spellCheck={false}
           />
           {queryDraft ? (
@@ -148,9 +154,15 @@ export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestC
           <option value={250}>250 rows</option>
           <option value={500}>500 rows</option>
         </select>
-        <button className="chip" type="button" onClick={resetFilters} disabled={!request.query && request.ecosystem === 'all' && request.sourceKind === 'all'}>
+        <button className="chip" type="button" onClick={resetFilters} disabled={!queryDraft && request.ecosystem === 'all' && request.sourceKind === 'all'}>
           Reset
         </button>
+      </div>
+      <div className="inventoryQueryHelp" aria-label="Inventory filter examples">
+        <span>Filters</span>
+        {['ecosystem:npm', 'ecosystem:pypi', 'source:package-lock', 'source:requirements', 'name:react', 'version:1.', 'path:node_modules'].map((token) => (
+          <button type="button" key={token} onClick={() => addFilterToken(token)}>{token}</button>
+        ))}
       </div>
       <InventoryFilter
         active={request.ecosystem}

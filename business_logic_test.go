@@ -545,7 +545,7 @@ func TestInventoryDeduplicatesBySourceDigestAndAppliesFilters(t *testing.T) {
 
 	filtered, err := index.ListPackageInventory(InventoryRequest{
 		Limit:      10,
-		Query:      "LEFT",
+		Query:      "left",
 		Ecosystem:  "npm",
 		SourceKind: "dependencies",
 	})
@@ -554,6 +554,13 @@ func TestInventoryDeduplicatesBySourceDigestAndAppliesFilters(t *testing.T) {
 	}
 	if filtered.Total != 2 || len(filtered.Packages) != 2 {
 		t.Fatalf("expected filtered npm inventory to include two source digests, got total=%d packages=%#v", filtered.Total, filtered.Packages)
+	}
+	hyphenated, err := index.ListPackageInventory(InventoryRequest{Limit: 10, Query: "left-pad"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hyphenated.Total != 2 || len(hyphenated.Packages) != 2 {
+		t.Fatalf("expected hyphenated free-text inventory query to use FTS tokens, got total=%d packages=%#v", hyphenated.Total, hyphenated.Packages)
 	}
 	var duplicateSource PackageRef
 	for _, pkg := range filtered.Packages {
@@ -600,6 +607,28 @@ func TestInventoryDeduplicatesBySourceDigestAndAppliesFilters(t *testing.T) {
 	}
 	if len(withoutFacets.EcosystemCounts) != 0 || len(withoutFacets.SourceKindCounts) != 0 {
 		t.Fatalf("expected skip facets request to omit count bins, got %#v", withoutFacets)
+	}
+
+	structured, err := index.ListPackageInventory(InventoryRequest{
+		Limit: 10,
+		Query: `ecosystem:npm name:left source:dependencies path:/a/`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if structured.Total != 1 || len(structured.Packages) != 1 || !strings.Contains(structured.Packages[0].SourcePath, string(filepath.Separator)+"a"+string(filepath.Separator)) {
+		t.Fatalf("expected structured inventory query to filter by ecosystem/name/source/path, got total=%d packages=%#v", structured.Total, structured.Packages)
+	}
+
+	quoted, err := index.ListPackageInventory(InventoryRequest{
+		Limit: 10,
+		Query: `"left banana"`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if quoted.Total != 0 {
+		t.Fatalf("expected quoted unmatched free text to return no rows, got %#v", quoted)
 	}
 }
 

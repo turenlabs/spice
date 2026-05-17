@@ -16,6 +16,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 
 	_ "modernc.org/sqlite"
 )
@@ -44,6 +45,7 @@ type indexedFile struct {
 }
 
 const scanEngineVersion = "2026-05-13-remote-rules-v2"
+const inventoryFTSVersion = "2026-05-16-inventory-fts-v1"
 
 func OpenScanIndex(dbPath string) (*ScanIndex, error) {
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
@@ -138,6 +140,30 @@ func (idx *ScanIndex) migrate(ctx context.Context) error {
 		`CREATE INDEX IF NOT EXISTS idx_package_inventory_source_hash ON package_inventory(source_sha256)`,
 		`CREATE INDEX IF NOT EXISTS idx_package_inventory_dedup ON package_inventory(ecosystem, name, version, source_kind, source_sha256, source_path)`,
 		`CREATE INDEX IF NOT EXISTS idx_package_inventory_filter ON package_inventory(ecosystem, source_kind, name, version)`,
+		`CREATE VIRTUAL TABLE IF NOT EXISTS package_inventory_fts USING fts5(
+			ecosystem,
+			name,
+			version,
+			source_kind,
+			source_path,
+			source_sha256,
+			content='package_inventory',
+			content_rowid='id'
+		)`,
+		`CREATE TRIGGER IF NOT EXISTS package_inventory_ai AFTER INSERT ON package_inventory BEGIN
+			INSERT INTO package_inventory_fts(rowid, ecosystem, name, version, source_kind, source_path, source_sha256)
+			VALUES (new.id, new.ecosystem, new.name, new.version, new.source_kind, new.source_path, new.source_sha256);
+		END`,
+		`CREATE TRIGGER IF NOT EXISTS package_inventory_ad AFTER DELETE ON package_inventory BEGIN
+			INSERT INTO package_inventory_fts(package_inventory_fts, rowid, ecosystem, name, version, source_kind, source_path, source_sha256)
+			VALUES ('delete', old.id, old.ecosystem, old.name, old.version, old.source_kind, old.source_path, old.source_sha256);
+		END`,
+		`CREATE TRIGGER IF NOT EXISTS package_inventory_au AFTER UPDATE ON package_inventory BEGIN
+			INSERT INTO package_inventory_fts(package_inventory_fts, rowid, ecosystem, name, version, source_kind, source_path, source_sha256)
+			VALUES ('delete', old.id, old.ecosystem, old.name, old.version, old.source_kind, old.source_path, old.source_sha256);
+			INSERT INTO package_inventory_fts(rowid, ecosystem, name, version, source_kind, source_path, source_sha256)
+			VALUES (new.id, new.ecosystem, new.name, new.version, new.source_kind, new.source_path, new.source_sha256);
+		END`,
 		`CREATE TABLE IF NOT EXISTS scan_runs (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			started_at TEXT NOT NULL,
@@ -159,7 +185,35 @@ func (idx *ScanIndex) migrate(ctx context.Context) error {
 			return err
 		}
 	}
+	if err := idx.rebuildInventoryFTSIfNeeded(ctx); err != nil {
+		return err
+	}
 	return nil
+}
+
+func (idx *ScanIndex) rebuildInventoryFTSIfNeeded(ctx context.Context) error {
+	var version string
+	err := idx.db.QueryRowContext(ctx, `SELECT value_json FROM app_settings WHERE key = ?`, "inventory_fts_version").Scan(&version)
+	if err == nil && version == inventoryFTSVersion {
+		return nil
+	}
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	var inventoryRows int
+	if err := idx.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM package_inventory`).Scan(&inventoryRows); err != nil {
+		return err
+	}
+	if inventoryRows > 0 {
+		if _, err := idx.db.ExecContext(ctx, `INSERT INTO package_inventory_fts(package_inventory_fts) VALUES('rebuild')`); err != nil {
+			return err
+		}
+	}
+	_, err = idx.db.ExecContext(ctx, `INSERT INTO app_settings (key, value_json, updated_at)
+		VALUES (?, ?, ?)
+		ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at`,
+		"inventory_fts_version", inventoryFTSVersion, time.Now().Format(time.RFC3339Nano))
+	return err
 }
 
 func (idx *ScanIndex) LoadSettings() (AppSettings, error) {
@@ -439,15 +493,155 @@ func inventoryWhere(req InventoryRequest) (string, []any) {
 		clauses = append(clauses, "source_kind = ?")
 		args = append(args, req.SourceKind)
 	}
-	if query := strings.TrimSpace(req.Query); query != "" {
-		needle := "%" + strings.ToLower(query) + "%"
-		clauses = append(clauses, `(lower(ecosystem) LIKE ? OR lower(name) LIKE ? OR lower(version) LIKE ? OR lower(source_path) LIKE ? OR lower(source_kind) LIKE ?)`)
-		args = append(args, needle, needle, needle, needle, needle)
+	query := parseInventoryQuery(req.Query)
+	for _, filter := range query.Filters {
+		switch filter.Field {
+		case "ecosystem":
+			clauses = append(clauses, "ecosystem = ? COLLATE NOCASE")
+			args = append(args, filter.Value)
+		case "name":
+			clauses = append(clauses, `name LIKE ? ESCAPE '\' COLLATE NOCASE`)
+			args = append(args, inventoryLike(filter.Value))
+		case "version":
+			clauses = append(clauses, `version LIKE ? ESCAPE '\' COLLATE NOCASE`)
+			args = append(args, inventoryLike(filter.Value))
+		case "source_kind":
+			clauses = append(clauses, `source_kind LIKE ? ESCAPE '\' COLLATE NOCASE`)
+			args = append(args, inventoryLike(filter.Value))
+		case "source_path":
+			clauses = append(clauses, `source_path LIKE ? ESCAPE '\' COLLATE NOCASE`)
+			args = append(args, inventoryLike(filter.Value))
+		case "source_sha256":
+			clauses = append(clauses, `source_sha256 LIKE ? ESCAPE '\' COLLATE NOCASE`)
+			args = append(args, inventoryLike(filter.Value))
+		}
+	}
+	if len(query.Terms) > 0 {
+		match := inventoryFTSQuery(query.Terms)
+		if match != "" {
+			clauses = append(clauses, `id IN (SELECT rowid FROM package_inventory_fts WHERE package_inventory_fts MATCH ?)`)
+			args = append(args, match)
+		}
 	}
 	if len(clauses) == 0 {
 		return "", nil
 	}
 	return " WHERE " + strings.Join(clauses, " AND "), args
+}
+
+type inventoryQuery struct {
+	Terms   []string
+	Filters []inventoryQueryFilter
+}
+
+type inventoryQueryFilter struct {
+	Field string
+	Value string
+}
+
+func parseInventoryQuery(raw string) inventoryQuery {
+	tokens := splitInventoryQuery(raw)
+	out := inventoryQuery{}
+	for _, token := range tokens {
+		key, value, ok := strings.Cut(token, ":")
+		if !ok || strings.TrimSpace(value) == "" {
+			out.Terms = append(out.Terms, token)
+			continue
+		}
+		field, ok := inventoryQueryField(key)
+		if !ok {
+			out.Terms = append(out.Terms, token)
+			continue
+		}
+		out.Filters = append(out.Filters, inventoryQueryFilter{Field: field, Value: strings.TrimSpace(value)})
+	}
+	return out
+}
+
+func splitInventoryQuery(raw string) []string {
+	var tokens []string
+	var current strings.Builder
+	var quote rune
+	escaped := false
+	for _, r := range raw {
+		switch {
+		case escaped:
+			current.WriteRune(r)
+			escaped = false
+		case r == '\\':
+			escaped = true
+		case quote != 0:
+			if r == quote {
+				quote = 0
+			} else {
+				current.WriteRune(r)
+			}
+		case r == '"' || r == '\'':
+			quote = r
+		case r == ' ' || r == '\t' || r == '\n' || r == '\r':
+			if token := strings.TrimSpace(current.String()); token != "" {
+				tokens = append(tokens, token)
+			}
+			current.Reset()
+		default:
+			current.WriteRune(r)
+		}
+	}
+	if token := strings.TrimSpace(current.String()); token != "" {
+		tokens = append(tokens, token)
+	}
+	return tokens
+}
+
+func inventoryQueryField(key string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(key)) {
+	case "ecosystem", "eco":
+		return "ecosystem", true
+	case "name", "pkg", "package":
+		return "name", true
+	case "version", "ver":
+		return "version", true
+	case "source", "kind", "type":
+		return "source_kind", true
+	case "path", "file", "location":
+		return "source_path", true
+	case "hash", "digest", "sha", "sha256":
+		return "source_sha256", true
+	default:
+		return "", false
+	}
+}
+
+func inventoryLike(value string) string {
+	value = strings.TrimSpace(value)
+	value = strings.ReplaceAll(value, `\`, `\\`)
+	value = strings.ReplaceAll(value, `%`, `\%`)
+	value = strings.ReplaceAll(value, `_`, `\_`)
+	return "%" + value + "%"
+}
+
+func inventoryFTSQuery(terms []string) string {
+	parts := make([]string, 0, len(terms))
+	for _, term := range terms {
+		term = strings.TrimSpace(term)
+		if term == "" {
+			continue
+		}
+		for _, piece := range strings.FieldsFunc(term, func(r rune) bool {
+			return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+		}) {
+			piece = strings.TrimSpace(piece)
+			if piece == "" {
+				continue
+			}
+			parts = append(parts, quoteFTSTerm(piece)+"*")
+		}
+	}
+	return strings.Join(parts, " AND ")
+}
+
+func quoteFTSTerm(term string) string {
+	return `"` + strings.ReplaceAll(term, `"`, `""`) + `"`
 }
 
 func dedupInventoryCountSQL(where string) string {

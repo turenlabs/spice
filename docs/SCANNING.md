@@ -57,6 +57,8 @@ Scan cache keys include:
 
 Cached results include findings, digest, and package inventory state. If package inventory rows are missing or incomplete, the pipeline reparses the manifest and backfills inventory without rerunning detectors.
 
+Inventory search uses a local SQLite full-text index plus structured filters. Free text searches package names, versions, source kinds, paths, ecosystems, and source digests. Supported filter tokens include `ecosystem:npm`, `name:react`, `version:18`, `source:package-lock`, `path:node_modules`, and `hash:<digest>`.
+
 ## Cancellation
 
 Scan cancellation is context-driven.
