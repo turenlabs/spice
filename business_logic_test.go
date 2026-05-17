@@ -555,15 +555,52 @@ func TestInventoryDeduplicatesBySourceDigestAndAppliesFilters(t *testing.T) {
 	if filtered.Total != 2 || len(filtered.Packages) != 2 {
 		t.Fatalf("expected filtered npm inventory to include two source digests, got total=%d packages=%#v", filtered.Total, filtered.Packages)
 	}
+	var duplicateSource PackageRef
 	for _, pkg := range filtered.Packages {
 		if pkg.Ecosystem != "npm" || pkg.Name != "left-pad" || !strings.HasSuffix(pkg.SourcePath, "package.json") {
 			t.Fatalf("unexpected filtered package: %#v", pkg)
+		}
+		if pkg.SourceCount == 2 {
+			duplicateSource = pkg
+		}
+		if pkg.SourceID == "" {
+			t.Fatalf("expected inventory row to include source ID: %#v", pkg)
+		}
+	}
+	if duplicateSource.Name == "" {
+		t.Fatalf("expected deduped row to report two source locations: %#v", filtered.Packages)
+	}
+	locations, err := index.ListPackageLocations(InventoryLocationsRequest{
+		Ecosystem:  duplicateSource.Ecosystem,
+		Name:       duplicateSource.Name,
+		Version:    duplicateSource.Version,
+		SourceKind: duplicateSource.SourceKind,
+		SourceID:   duplicateSource.SourceID,
+		Limit:      10,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if locations.Total != 2 || len(locations.Locations) != 2 {
+		t.Fatalf("expected two locations for deduped source digest, got %#v", locations)
+	}
+	for _, location := range locations.Locations {
+		if location.SourceSHA256 != duplicateSource.SourceID {
+			t.Fatalf("expected location source digest %q, got %#v", duplicateSource.SourceID, location)
 		}
 	}
 	assertInventoryBin(t, all.EcosystemCounts, "npm", 2)
 	assertInventoryBin(t, all.EcosystemCounts, "pypi", 1)
 	assertInventoryBin(t, all.SourceKindCounts, "dependencies", 2)
 	assertInventoryBin(t, all.SourceKindCounts, "requirements", 1)
+
+	withoutFacets, err := index.ListPackageInventory(InventoryRequest{Limit: 10, SkipFacets: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(withoutFacets.EcosystemCounts) != 0 || len(withoutFacets.SourceKindCounts) != 0 {
+		t.Fatalf("expected skip facets request to omit count bins, got %#v", withoutFacets)
+	}
 }
 
 func inventoryWrite(path string, digest string, pkg PackageRef) indexWrite {

@@ -92,14 +92,63 @@ func BenchmarkScanPackageManifestsWarmCache(b *testing.B) {
 }
 
 func BenchmarkInventoryPageQuery(b *testing.B) {
+	index := buildBenchmarkInventory(b, 10000)
+	defer index.Close()
+
+	req := InventoryRequest{Limit: 100, Offset: 5000, Query: "package", Ecosystem: "npm", SourceKind: "dependencies"}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := index.ListPackageInventory(req); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkInventoryPageQueryWithoutFacets(b *testing.B) {
+	index := buildBenchmarkInventory(b, 10000)
+	defer index.Close()
+
+	req := InventoryRequest{Limit: 100, Offset: 5000, Query: "package", Ecosystem: "npm", SourceKind: "dependencies", SkipFacets: true}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := index.ListPackageInventory(req); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkInventoryLocationsQuery(b *testing.B) {
+	index := buildBenchmarkInventory(b, 10000)
+	defer index.Close()
+
+	req := InventoryLocationsRequest{
+		Ecosystem:  "npm",
+		Name:       "package-05000",
+		Version:    "1.0.0",
+		SourceKind: "dependencies",
+		SourceID:   fmt.Sprintf("%064d", 5000),
+		Limit:      50,
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := index.ListPackageLocations(req); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func buildBenchmarkInventory(b *testing.B, count int) *ScanIndex {
+	b.Helper()
 	dir := b.TempDir()
 	index, err := OpenScanIndex(filepath.Join(dir, "scan-index.sqlite"))
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer index.Close()
-	writes := make([]indexWrite, 0, 10000)
-	for i := 0; i < 10000; i++ {
+	writes := make([]indexWrite, 0, count)
+	for i := 0; i < count; i++ {
 		path := filepath.Join(dir, fmt.Sprintf("pkg-%05d/package.json", i))
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			b.Fatal(err)
@@ -126,18 +175,11 @@ func BenchmarkInventoryPageQuery(b *testing.B) {
 	for start := 0; start < len(writes); start += indexBatchSize {
 		end := min(start+indexBatchSize, len(writes))
 		if err := index.UpsertBatch(writes[start:end], scanEngineVersion+":benchmark"); err != nil {
+			_ = index.Close()
 			b.Fatal(err)
 		}
 	}
-
-	req := InventoryRequest{Limit: 100, Offset: 5000, Query: "package", Ecosystem: "npm", SourceKind: "dependencies"}
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		if _, err := index.ListPackageInventory(req); err != nil {
-			b.Fatal(err)
-		}
-	}
+	return index
 }
 
 func makeBenchFiles(b *testing.B, root string, count int, pattern string, data []byte) {

@@ -12,6 +12,8 @@ import type {
   FilePreview,
   Finding,
   FindingAction,
+  InventoryLocationRequest,
+  InventoryLocationsResult,
   InventoryRequest,
   InventoryResult,
   Mode,
@@ -41,6 +43,7 @@ declare global {
           PreviewFile: (request: { path: string }) => Promise<FilePreview>;
           DeletePath: (request: { path: string }) => Promise<{ path: string; deletedAt: string }>;
           Inventory: (request: InventoryRequest) => Promise<InventoryResult>;
+          InventoryLocations: (request: InventoryLocationRequest) => Promise<InventoryLocationsResult>;
           StopScan: () => Promise<void>;
           DetectionStatus: () => Promise<DetectionStatus>;
           RefreshDetections: () => Promise<DetectionStatus>;
@@ -292,19 +295,24 @@ function App() {
     setInventoryLoading(true);
     try {
       const result = await api()!.Inventory(request);
-      setInventory({
+      setInventory((current) => ({
         packages: result.packages ?? [],
         total: result.total ?? 0,
         limit: result.limit || request.limit,
         offset: result.offset || request.offset,
-        ecosystemCounts: result.ecosystemCounts ?? [],
-        sourceKindCounts: result.sourceKindCounts ?? [],
-      });
+        ecosystemCounts: result.ecosystemCounts?.length ? result.ecosystemCounts : current.ecosystemCounts,
+        sourceKindCounts: result.sourceKindCounts?.length ? result.sourceKindCounts : current.sourceKindCounts,
+      }));
     } catch {
       setInventory(emptyInventory);
     } finally {
       setInventoryLoading(false);
     }
+  }
+
+  async function loadInventoryLocations(request: InventoryLocationRequest) {
+    if (!api()) return { locations: [], total: 0, limit: request.limit };
+    return api()!.InventoryLocations(request);
   }
 
   async function stopScan() {
@@ -396,6 +404,7 @@ function App() {
                 inventory={inventory}
                 loading={inventoryLoading}
                 request={inventoryRequest}
+                onLoadLocations={loadInventoryLocations}
                 onRequestChange={setInventoryRequest}
               />
             ) : mode === 'findings' ? (

@@ -136,6 +136,8 @@ func (idx *ScanIndex) migrate(ctx context.Context) error {
 		`CREATE INDEX IF NOT EXISTS idx_package_inventory_name ON package_inventory(ecosystem, name)`,
 		`CREATE INDEX IF NOT EXISTS idx_package_inventory_source_path ON package_inventory(source_path)`,
 		`CREATE INDEX IF NOT EXISTS idx_package_inventory_source_hash ON package_inventory(source_sha256)`,
+		`CREATE INDEX IF NOT EXISTS idx_package_inventory_dedup ON package_inventory(ecosystem, name, version, source_kind, source_sha256, source_path)`,
+		`CREATE INDEX IF NOT EXISTS idx_package_inventory_filter ON package_inventory(ecosystem, source_kind, name, version)`,
 		`CREATE TABLE IF NOT EXISTS scan_runs (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			started_at TEXT NOT NULL,
@@ -295,11 +297,14 @@ func (idx *ScanIndex) ReplacePackagesForSource(sourcePath string, packages []Pac
 }
 
 type PackageRef struct {
-	Ecosystem  string `json:"ecosystem"`
-	Name       string `json:"name"`
-	Version    string `json:"version"`
-	SourcePath string `json:"sourcePath"`
-	SourceKind string `json:"sourceKind"`
+	Ecosystem    string `json:"ecosystem"`
+	Name         string `json:"name"`
+	Version      string `json:"version"`
+	SourcePath   string `json:"sourcePath"`
+	SourceKind   string `json:"sourceKind"`
+	SourceID     string `json:"sourceId,omitempty"`
+	SourceCount  int    `json:"sourceCount,omitempty"`
+	DiscoveredAt string `json:"discoveredAt,omitempty"`
 }
 
 type InventoryBin struct {
@@ -328,9 +333,17 @@ func (idx *ScanIndex) ListPackageInventory(req InventoryRequest) (InventoryResul
 		return InventoryResult{}, err
 	}
 	queryArgs := append(append([]any{}, args...), limit, offset)
-	rows, err := idx.db.QueryContext(context.Background(), `SELECT ecosystem, name, version, MIN(source_path) AS source_path, source_kind
+	rows, err := idx.db.QueryContext(context.Background(), `SELECT
+			ecosystem,
+			name,
+			version,
+			MIN(source_path) AS source_path,
+			source_kind,
+			CASE WHEN source_sha256 = '' THEN source_path ELSE source_sha256 END AS source_id,
+			COUNT(*) AS source_count,
+			MAX(discovered_at) AS discovered_at
 		FROM package_inventory`+where+`
-		GROUP BY ecosystem, name, version, source_kind, CASE WHEN source_sha256 = '' THEN source_path ELSE source_sha256 END
+		GROUP BY ecosystem, name, version, source_kind, source_id
 		ORDER BY ecosystem, name, version, source_path
 		LIMIT ? OFFSET ?`, queryArgs...)
 	if err != nil {
@@ -341,7 +354,7 @@ func (idx *ScanIndex) ListPackageInventory(req InventoryRequest) (InventoryResul
 	var packages []PackageRef
 	for rows.Next() {
 		var pkg PackageRef
-		if err := rows.Scan(&pkg.Ecosystem, &pkg.Name, &pkg.Version, &pkg.SourcePath, &pkg.SourceKind); err != nil {
+		if err := rows.Scan(&pkg.Ecosystem, &pkg.Name, &pkg.Version, &pkg.SourcePath, &pkg.SourceKind, &pkg.SourceID, &pkg.SourceCount, &pkg.DiscoveredAt); err != nil {
 			return InventoryResult{}, err
 		}
 		packages = append(packages, pkg)
@@ -349,13 +362,17 @@ func (idx *ScanIndex) ListPackageInventory(req InventoryRequest) (InventoryResul
 	if err := rows.Err(); err != nil {
 		return InventoryResult{}, err
 	}
-	ecosystemCounts, err := idx.inventoryBins("ecosystem")
-	if err != nil {
-		return InventoryResult{}, err
-	}
-	sourceKindCounts, err := idx.inventoryBins("source_kind")
-	if err != nil {
-		return InventoryResult{}, err
+	var ecosystemCounts []InventoryBin
+	var sourceKindCounts []InventoryBin
+	if !req.SkipFacets {
+		ecosystemCounts, err = idx.inventoryBins("ecosystem")
+		if err != nil {
+			return InventoryResult{}, err
+		}
+		sourceKindCounts, err = idx.inventoryBins("source_kind")
+		if err != nil {
+			return InventoryResult{}, err
+		}
 	}
 	return InventoryResult{
 		Packages:         packages,
@@ -365,6 +382,50 @@ func (idx *ScanIndex) ListPackageInventory(req InventoryRequest) (InventoryResul
 		EcosystemCounts:  ecosystemCounts,
 		SourceKindCounts: sourceKindCounts,
 	}, nil
+}
+
+func (idx *ScanIndex) ListPackageLocations(req InventoryLocationsRequest) (InventoryLocationsResult, error) {
+	if idx == nil || idx.db == nil {
+		return InventoryLocationsResult{}, nil
+	}
+	limit := req.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 500 {
+		limit = 500
+	}
+	sourceID := strings.TrimSpace(req.SourceID)
+	if sourceID == "" {
+		sourceID = strings.TrimSpace(req.SourcePath)
+	}
+	where := `ecosystem = ? AND name = ? AND version = ? AND source_kind = ? AND CASE WHEN source_sha256 = '' THEN source_path ELSE source_sha256 END = ?`
+	args := []any{req.Ecosystem, req.Name, req.Version, req.SourceKind, sourceID}
+	var total int
+	if err := idx.db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM package_inventory WHERE `+where, args...).Scan(&total); err != nil {
+		return InventoryLocationsResult{}, err
+	}
+	rows, err := idx.db.QueryContext(context.Background(), `SELECT source_path, source_kind, source_sha256, discovered_at
+		FROM package_inventory
+		WHERE `+where+`
+		ORDER BY source_path
+		LIMIT ?`, append(args, limit)...)
+	if err != nil {
+		return InventoryLocationsResult{}, err
+	}
+	defer rows.Close()
+	var locations []InventoryLocation
+	for rows.Next() {
+		var location InventoryLocation
+		if err := rows.Scan(&location.SourcePath, &location.SourceKind, &location.SourceSHA256, &location.DiscoveredAt); err != nil {
+			return InventoryLocationsResult{}, err
+		}
+		locations = append(locations, location)
+	}
+	if err := rows.Err(); err != nil {
+		return InventoryLocationsResult{}, err
+	}
+	return InventoryLocationsResult{Locations: locations, Total: total, Limit: limit}, nil
 }
 
 func inventoryWhere(req InventoryRequest) (string, []any) {

@@ -2239,8 +2239,8 @@ button {
   width: 118px;
 }
 
-.inventoryColSource {
-  width: auto;
+.inventoryColLocations {
+  width: 32%;
 }
 
 .inventoryBadge {
@@ -2285,6 +2285,168 @@ button {
 .inventoryPath {
   max-width: none;
   overflow-wrap: normal;
+}
+
+.inventoryRow {
+  cursor: pointer;
+}
+
+.inventoryRow[data-open="true"] {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.inventoryExpander {
+  align-items: center;
+  color: var(--fg-2);
+  display: inline-flex;
+  height: 16px;
+  justify-content: center;
+  margin-right: 6px;
+  vertical-align: -3px;
+  width: 16px;
+}
+
+.inventoryLocationCell {
+  color: var(--fg-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inventoryLocationCell b {
+  color: var(--fg-0);
+  font-family: "Geist Mono", monospace;
+  font-size: 12px;
+  font-weight: 650;
+  margin-right: 5px;
+}
+
+.inventoryLocationCell span {
+  margin-right: 8px;
+}
+
+.inventoryLocationCell em {
+  color: var(--fg-3);
+  font-style: normal;
+}
+
+.inventoryDetailRow td {
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--bd-1);
+  padding: 0;
+}
+
+.inventoryDetails {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px 16px 128px;
+}
+
+.inventoryDetailMeta {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.inventoryDetailMeta span {
+  background: var(--bg-2);
+  border: 1px solid var(--bd-1);
+  border-radius: 8px;
+  color: var(--fg-1);
+  display: grid;
+  font-size: 12px;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px 10px;
+}
+
+.inventoryDetailMeta b {
+  color: var(--fg-3);
+  font-family: "Geist Mono", monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.inventoryLocationHead {
+  align-items: center;
+  color: var(--fg-2);
+  display: flex;
+  font-size: 12px;
+  justify-content: space-between;
+}
+
+.inventoryLocationHead strong {
+  align-items: center;
+  color: var(--fg-0);
+  display: inline-flex;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.inventoryLocationStatus {
+  color: var(--fg-2);
+  font-size: 12px;
+  padding: 4px 0;
+}
+
+.inventoryLocations {
+  border: 1px solid var(--bd-1);
+  border-radius: 8px;
+  display: grid;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.inventoryLocation {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  min-height: 34px;
+  padding: 6px 8px 6px 10px;
+}
+
+.inventoryLocation + .inventoryLocation {
+  border-top: 1px solid var(--bd-1);
+}
+
+.inventoryLocation .path {
+  color: var(--fg-1);
+  font-family: "Geist Mono", monospace;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inventoryLocation button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: var(--fg-2);
+  cursor: pointer;
+  display: flex;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+
+.inventoryLocation button:hover {
+  background: var(--bg-3);
+  color: var(--fg-0);
+}
+
+@media (max-width: 900px) {
+  .inventoryDetails {
+    padding-left: 16px;
+  }
+
+  .inventoryDetailMeta {
+    grid-template-columns: 1fr;
+  }
 }
 
 .inventoryNoResults {

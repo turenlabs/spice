@@ -103,6 +103,9 @@ export type PackageRef = {
   version: string;
   sourcePath: string;
   sourceKind: string;
+  sourceId?: string;
+  sourceCount?: number;
+  discoveredAt?: string;
 };
 
 export type InventoryBin = {
@@ -116,6 +119,7 @@ export type InventoryRequest = {
   query: string;
   ecosystem: string;
   sourceKind: string;
+  skipFacets?: boolean;
 };
 
 export type InventoryResult = {
@@ -125,4 +129,27 @@ export type InventoryResult = {
   offset: number;
   ecosystemCounts: InventoryBin[];
   sourceKindCounts: InventoryBin[];
+};
+
+export type InventoryLocationRequest = {
+  ecosystem: string;
+  name: string;
+  version: string;
+  sourceKind: string;
+  sourceId?: string;
+  sourcePath?: string;
+  limit: number;
+};
+
+export type InventoryLocation = {
+  sourcePath: string;
+  sourceKind: string;
+  sourceSha256: string;
+  discoveredAt: string;
+};
+
+export type InventoryLocationsResult = {
+  locations: InventoryLocation[];
+  total: number;
+  limit: number;
 };

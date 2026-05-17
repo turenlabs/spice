@@ -102,6 +102,7 @@ type InventoryRequest struct {
 	Query      string `json:"query"`
 	Ecosystem  string `json:"ecosystem"`
 	SourceKind string `json:"sourceKind"`
+	SkipFacets bool   `json:"skipFacets"`
 }
 
 type InventoryResult struct {
@@ -111,6 +112,29 @@ type InventoryResult struct {
 	Offset           int            `json:"offset"`
 	EcosystemCounts  []InventoryBin `json:"ecosystemCounts"`
 	SourceKindCounts []InventoryBin `json:"sourceKindCounts"`
+}
+
+type InventoryLocationsRequest struct {
+	Ecosystem  string `json:"ecosystem"`
+	Name       string `json:"name"`
+	Version    string `json:"version"`
+	SourceKind string `json:"sourceKind"`
+	SourceID   string `json:"sourceId"`
+	SourcePath string `json:"sourcePath"`
+	Limit      int    `json:"limit"`
+}
+
+type InventoryLocation struct {
+	SourcePath   string `json:"sourcePath"`
+	SourceKind   string `json:"sourceKind"`
+	SourceSHA256 string `json:"sourceSha256"`
+	DiscoveredAt string `json:"discoveredAt"`
+}
+
+type InventoryLocationsResult struct {
+	Locations []InventoryLocation `json:"locations"`
+	Total     int                 `json:"total"`
+	Limit     int                 `json:"limit"`
 }
 
 type DetectionStatus struct {
@@ -319,6 +343,15 @@ func (a *App) Inventory(req InventoryRequest) (InventoryResult, error) {
 		return InventoryResult{}, err
 	}
 	return result, nil
+}
+
+func (a *App) InventoryLocations(req InventoryLocationsRequest) (InventoryLocationsResult, error) {
+	index, err := OpenFileIndex()
+	if err != nil {
+		return InventoryLocationsResult{}, err
+	}
+	defer index.Close()
+	return index.ListPackageLocations(req)
 }
 
 func (a *App) DetectionStatus() DetectionStatus {
