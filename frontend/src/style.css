@@ -2191,6 +2191,7 @@ button {
   width: 24px;
 }
 
+.inventoryRecipes,
 .inventoryQueryHelp {
   align-items: center;
   border-bottom: 1px solid var(--bd-1);
@@ -2198,6 +2199,13 @@ button {
   flex-wrap: wrap;
   gap: 6px;
   padding: 8px 16px;
+}
+
+.inventoryRecipes {
+  background: color-mix(in srgb, var(--bg-1) 72%, transparent);
+  gap: 8px;
+  padding-bottom: 10px;
+  padding-top: 10px;
 }
 
 .inventoryFilterBuilder,
@@ -2210,6 +2218,7 @@ button {
   padding: 8px 16px;
 }
 
+.inventoryRecipes span,
 .inventoryFilterBuilder span,
 .inventoryActiveFilters span {
   color: var(--fg-3);
@@ -2233,6 +2242,7 @@ button {
   padding: 0 9px;
 }
 
+.inventoryRecipes button,
 .inventoryFilterBuilder button,
 .inventoryActiveFilters button {
   align-items: center;
@@ -2249,6 +2259,20 @@ button {
   padding: 0 10px;
 }
 
+.inventoryRecipes button {
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-2));
+  color: var(--fg-1);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.inventoryRecipes button:first-of-type {
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--bd-1));
+  color: var(--fg-0);
+}
+
+.inventoryRecipes button:hover,
+.inventoryRecipes button:focus-visible,
 .inventoryFilterBuilder button:hover,
 .inventoryActiveFilters button:hover {
   border-color: var(--accent);
@@ -2262,6 +2286,18 @@ button {
 
 .inventoryActiveFilters {
   padding-top: 0;
+}
+
+.inventoryActiveFilters .inventoryClearFilters {
+  background: transparent;
+  border-color: transparent;
+  color: var(--fg-3);
+}
+
+.inventoryActiveFilters .inventoryClearFilters:hover {
+  background: var(--bg-2);
+  border-color: var(--bd-1);
+  color: var(--fg-0);
 }
 
 .inventoryQueryHelp span {
@@ -2301,19 +2337,6 @@ button {
   padding: 0 10px;
 }
 
-.inventoryFilters {
-  align-items: center;
-  border-bottom: 1px solid var(--bd-1);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 10px 16px;
-}
-
-.inventoryFilters + .inventoryFilters {
-  padding-top: 0;
-}
-
 .inventoryPager {
   align-items: center;
   border-bottom: 1px solid var(--bd-1);
@@ -2328,15 +2351,6 @@ button {
 .inventoryPager span {
   min-width: 148px;
   text-align: center;
-}
-
-.filterLabel {
-  color: var(--fg-2);
-  font-family: "Geist Mono", monospace;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  margin-right: 4px;
-  text-transform: uppercase;
 }
 
 .inventoryTable {

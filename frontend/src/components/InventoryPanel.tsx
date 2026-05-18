@@ -33,6 +33,19 @@ type FilterOption = {
   value: string;
 };
 
+type InventoryRecipe = {
+  label: string;
+  query: string;
+};
+
+const inventoryRecipes: InventoryRecipe[] = [
+  { label: 'JavaScript packages', query: 'ecosystem:npm' },
+  { label: 'Python packages', query: 'ecosystem:pypi' },
+  { label: 'Lockfiles', query: 'source:package-lock' },
+  { label: 'Node modules', query: 'path:node_modules' },
+  { label: 'Docker bases', query: 'ecosystem:docker' },
+];
+
 export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestChange, request }: InventoryPanelProps) {
   const packages = inventory.packages ?? [];
   const total = inventory.total ?? 0;
@@ -68,27 +81,38 @@ export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestC
   const patchRequest = (patch: Partial<InventoryRequest>, facets = false) => {
     onRequestChange({ ...request, ...patch, skipFacets: !facets });
   };
+  const runQuery = (query: string, facets = false) => {
+    setQueryDraft(query);
+    onRequestChange({
+      ...request,
+      query,
+      ecosystem: 'all',
+      sourceKind: 'all',
+      offset: 0,
+      skipFacets: !facets,
+    });
+  };
   const resetFilters = () => {
-    setQueryDraft('');
-    onRequestChange({ ...request, offset: 0, query: '', ecosystem: 'all', sourceKind: 'all', skipFacets: false });
+    runQuery('', true);
   };
   const addFilterToken = (token: string) => {
-    const next = [queryDraft.trim(), token].filter(Boolean).join(' ');
-    setQueryDraft(next);
-    onRequestChange({ ...request, query: next, offset: 0, skipFacets: true });
+    const separator = token.indexOf(':');
+    const key = separator > 0 ? canonicalFilterKey(token.slice(0, separator)) : null;
+    const next = key
+      ? replaceStructuredFilter(queryDraft, key, token)
+      : [queryDraft.trim(), token].filter(Boolean).join(' ');
+    runQuery(next);
   };
   const applySelectedFilter = () => {
     const value = filterValue.trim();
     if (!value) return;
     const token = `${filterKey}:${quoteFilterValue(value)}`;
     const next = replaceStructuredFilter(queryDraft, filterKey, token);
-    setQueryDraft(next);
-    onRequestChange({ ...request, query: next, offset: 0, skipFacets: true });
+    runQuery(next);
   };
   const removeStructuredFilter = (key: FilterKey) => {
     const next = replaceStructuredFilter(queryDraft, key, '');
-    setQueryDraft(next);
-    onRequestChange({ ...request, query: next, offset: 0, skipFacets: true });
+    runQuery(next);
   };
   const goPage = (direction: -1 | 1) => {
     const nextOffset = Math.max(0, Math.min(Math.max(total - limit, 0), offset + direction * limit));
@@ -150,9 +174,17 @@ export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestC
       <div className="panelHeader">
         <div>
           <h2>Local inventory</h2>
-          <p>Packages and container bases Spice has seen on this workstation.</p>
+          <p>Find packages by ecosystem, source file, version, or path. Open a row to see where Spice found it.</p>
         </div>
         <span>{loading ? <><LoaderCircle className="spin inlineSpin" size={13} /> Loading</> : `${total.toLocaleString()} rows`}</span>
+      </div>
+      <div className="inventoryRecipes" aria-label="Inventory starter filters">
+        <span>Start with</span>
+        {inventoryRecipes.map((recipe) => (
+          <button type="button" key={recipe.query} onClick={() => runQuery(recipe.query)}>
+            {recipe.label}
+          </button>
+        ))}
       </div>
       <div className="inventoryTools">
         <label className="inventorySearch">
@@ -160,13 +192,12 @@ export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestC
           <input
             value={queryDraft}
             onChange={(event) => setQueryDraft(event.target.value)}
-            placeholder="Filter packages: react ecosystem:npm source:package-lock path:node_modules"
+            placeholder="Search package names, versions, or paths"
             spellCheck={false}
           />
           {queryDraft ? (
             <button type="button" onClick={() => {
-              setQueryDraft('');
-              patchRequest({ query: '', offset: 0 });
+              runQuery('');
             }} aria-label="Clear inventory search">
               <X size={14} />
             </button>
@@ -188,7 +219,7 @@ export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestC
         </button>
       </div>
       <div className="inventoryFilterBuilder" aria-label="Inventory filter builder">
-        <span>Filter</span>
+        <span>Add filter</span>
         <select value={filterKey} onChange={(event) => setFilterKey(event.target.value as FilterKey)} aria-label="Filter key">
           <option value="ecosystem">Ecosystem</option>
           <option value="source">Source type</option>
@@ -203,39 +234,30 @@ export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestC
             <option value={option.value} key={`${filterKey}-${option.value}`}>{option.label}</option>
           ))}
         </select>
-        <button type="button" onClick={applySelectedFilter} disabled={!filterValue}>Add filter</button>
-        <button type="button" onClick={() => addFilterToken('path:node_modules')}>path:node_modules</button>
+        <button type="button" onClick={applySelectedFilter} disabled={!filterValue}>Apply</button>
+        <button type="button" onClick={() => addFilterToken('path:node_modules')}>Path contains node_modules</button>
       </div>
       {activeFilters.length > 0 ? (
         <div className="inventoryActiveFilters" aria-label="Active inventory filters">
           <span>Active</span>
           {activeFilters.map((filter) => (
             <button type="button" key={filter.key} onClick={() => removeStructuredFilter(filter.key)}>
-              {filter.key}:{filter.value}
+              {filterChipLabel(filter)}
               <X size={12} />
             </button>
           ))}
+          <button className="inventoryClearFilters" type="button" onClick={resetFilters}>
+            Clear all
+          </button>
         </div>
       ) : (
         <div className="inventoryQueryHelp" aria-label="Inventory filter examples">
-          <span>Try</span>
+          <span>Examples</span>
           {['ecosystem:npm', 'ecosystem:pypi', 'source:package-lock', 'source:requirements'].map((token) => (
             <button type="button" key={token} onClick={() => addFilterToken(token)}>{token}</button>
           ))}
         </div>
       )}
-      <InventoryFilter
-        active={request.ecosystem}
-        bins={inventory.ecosystemCounts ?? []}
-        label="Ecosystem"
-        onChange={(ecosystem) => patchRequest({ ecosystem, offset: 0 }, true)}
-      />
-      <InventoryFilter
-        active={request.sourceKind}
-        bins={inventory.sourceKindCounts ?? []}
-        label="Source"
-        onChange={(sourceKind) => patchRequest({ sourceKind, offset: 0 }, true)}
-      />
       <div className="inventoryPager">
         <button className="btn btn-ghost btn-icon" type="button" onClick={() => goPage(-1)} disabled={offset === 0} aria-label="Previous inventory page">
           <ChevronLeft size={15} />
@@ -514,24 +536,23 @@ function unquoteFilterValue(value: string) {
   return value.replaceAll('\\"', '"');
 }
 
-function InventoryFilter({ active, bins, label, onChange }: {
-  active: string;
-  bins: InventoryBin[];
-  label: string;
-  onChange: (value: string) => void;
-}) {
-  const total = bins.reduce((sum, bin) => sum + bin.count, 0);
-  return (
-    <div className="inventoryFilters" aria-label={`Inventory ${label.toLowerCase()} filters`}>
-      <span className="filterLabel">{label}</span>
-      <button className="chip" data-active={active === 'all'} type="button" onClick={() => onChange('all')}>
-        All <span className="count">{total.toLocaleString()}</span>
-      </button>
-      {bins.map((bin) => (
-        <button className="chip" data-active={active === bin.value} type="button" key={bin.value} onClick={() => onChange(bin.value)}>
-          {bin.value} <span className="count">{bin.count.toLocaleString()}</span>
-        </button>
-      ))}
-    </div>
-  );
+function filterChipLabel(filter: { key: FilterKey; value: string }) {
+  return `${filterKeyLabel(filter.key)} is ${filter.value}`;
+}
+
+function filterKeyLabel(key: FilterKey) {
+  switch (key) {
+    case 'ecosystem':
+      return 'Ecosystem';
+    case 'source':
+      return 'Source type';
+    case 'name':
+      return 'Package';
+    case 'version':
+      return 'Version';
+    case 'path':
+      return 'Path contains';
+    default:
+      return key;
+  }
 }
