@@ -857,6 +857,16 @@ textarea:focus {
   overflow: hidden;
 }
 
+.inventoryPanel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.inventoryPanelFill {
+  flex: 1;
+}
+
 .panelHeader {
   align-items: center;
   border-bottom: 1px solid var(--border);
@@ -1272,7 +1282,10 @@ button {
 }
 
 .main-scroll {
+  display: flex;
+  flex-direction: column;
   flex: 1;
+  min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
   padding: var(--pad-y) var(--pad-x);
@@ -2392,7 +2405,8 @@ button {
 }
 
 .inventoryTable {
-  max-height: calc(100vh - 360px);
+  flex: 1;
+  min-height: 260px;
   overflow: auto;
   position: relative;
 }

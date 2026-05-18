@@ -4,6 +4,7 @@ import type { MouseEvent } from 'react';
 import type { InventoryBin, InventoryLocation, InventoryLocationsResult, InventoryRequest, InventoryResult, PackageRef } from '../types';
 
 type InventoryPanelProps = {
+  className?: string;
   inventory: InventoryResult;
   request: InventoryRequest;
   loading?: boolean;
@@ -58,7 +59,7 @@ const inventoryRecipes: InventoryRecipe[] = [
   { label: 'Docker bases', query: 'ecosystem:docker' },
 ];
 
-export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestChange, request }: InventoryPanelProps) {
+export function InventoryPanel({ className, inventory, loading, onLoadLocations, onRequestChange, request }: InventoryPanelProps) {
   const packages = inventory.packages ?? [];
   const total = inventory.total ?? 0;
   const limit = inventory.limit || request.limit;
@@ -174,7 +175,7 @@ export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestC
   }
 
   return (
-    <section className="card dataPanel">
+    <section className={['card dataPanel inventoryPanel', className].filter(Boolean).join(' ')}>
       <div className="panelHeader">
         <div>
           <h2>Local inventory</h2>

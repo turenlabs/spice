@@ -408,6 +408,7 @@ function App() {
               />
             ) : mode === 'inventory' ? (
               <InventoryPanel
+                className="inventoryPanelFill"
                 inventory={inventory}
                 loading={inventoryLoading}
                 request={inventoryRequest}
