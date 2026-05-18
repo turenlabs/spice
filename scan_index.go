@@ -386,6 +386,11 @@ func (idx *ScanIndex) ListPackageInventory(req InventoryRequest) (InventoryResul
 	if err := idx.db.QueryRowContext(context.Background(), dedupInventoryCountSQL(where), args...).Scan(&total); err != nil {
 		return InventoryResult{}, err
 	}
+	if total == 0 {
+		offset = 0
+	} else if maxOffset := ((total - 1) / limit) * limit; offset > maxOffset {
+		offset = maxOffset
+	}
 	queryArgs := append(append([]any{}, args...), limit, offset)
 	rows, err := idx.db.QueryContext(context.Background(), `SELECT
 			ecosystem,

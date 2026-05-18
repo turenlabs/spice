@@ -299,10 +299,17 @@ function App() {
         packages: result.packages ?? [],
         total: result.total ?? 0,
         limit: result.limit || request.limit,
-        offset: result.offset || request.offset,
+        offset: result.offset ?? request.offset,
         ecosystemCounts: result.ecosystemCounts?.length ? result.ecosystemCounts : current.ecosystemCounts,
         sourceKindCounts: result.sourceKindCounts?.length ? result.sourceKindCounts : current.sourceKindCounts,
       }));
+      if ((result.offset ?? request.offset) !== request.offset || (result.limit || request.limit) !== request.limit) {
+        setInventoryRequest({
+          ...request,
+          offset: result.offset ?? request.offset,
+          limit: result.limit || request.limit,
+        });
+      }
     } catch {
       setInventory(emptyInventory);
     } finally {

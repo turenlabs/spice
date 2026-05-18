@@ -62,7 +62,7 @@ export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestC
   const packages = inventory.packages ?? [];
   const total = inventory.total ?? 0;
   const limit = inventory.limit || request.limit;
-  const offset = inventory.offset || request.offset;
+  const offset = inventory.offset ?? request.offset;
   const currentPage = total === 0 ? 0 : Math.floor(offset / limit) + 1;
   const pageCount = total === 0 ? 0 : Math.ceil(total / limit);
   const [openKey, setOpenKey] = useState<string | null>(null);

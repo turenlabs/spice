@@ -632,6 +632,17 @@ func TestInventoryDeduplicatesBySourceDigestAndAppliesFilters(t *testing.T) {
 		t.Fatalf("expected path:node_modules to use path-scoped indexed search, got total=%d packages=%#v", pathFTS.Total, pathFTS.Packages)
 	}
 
+	clamped, err := index.ListPackageInventory(InventoryRequest{
+		Limit:  2,
+		Offset: 999,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if clamped.Offset != 2 || clamped.Total != 4 || len(clamped.Packages) != 2 {
+		t.Fatalf("expected out-of-range inventory offset to clamp to last page, got offset=%d total=%d packages=%#v", clamped.Offset, clamped.Total, clamped.Packages)
+	}
+
 	quoted, err := index.ListPackageInventory(InventoryRequest{
 		Limit: 10,
 		Query: `"left banana"`,
