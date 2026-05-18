@@ -2190,7 +2190,11 @@ button {
   color: var(--fg-3);
 }
 
-.inventorySearch > button {
+.inventorySearch > svg {
+  flex: 0 0 auto;
+}
+
+.inventorySearchClear {
   align-items: center;
   background: transparent;
   border: 0;
@@ -2211,6 +2215,7 @@ button {
   color: var(--fg-1);
   cursor: pointer;
   display: inline-flex;
+  flex: 0 1 auto;
   gap: 6px;
   font-family: "Geist Mono", monospace;
   font-size: 11px;
@@ -2219,6 +2224,14 @@ button {
   min-width: 0;
   padding: 0 8px;
   width: auto;
+}
+
+.inventorySearchToken span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .inventorySearchToken svg {

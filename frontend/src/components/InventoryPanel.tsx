@@ -195,7 +195,7 @@ export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestC
                 onClick={() => removeStructuredFilter(filter.key)}
                 title="Remove filter"
               >
-                {filterChipLabel(filter)}
+                <span>{filterChipLabel(filter)}</span>
                 <X size={12} />
               </button>
             ))}
@@ -207,7 +207,7 @@ export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestC
               spellCheck={false}
             />
             {queryDraft ? (
-              <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => runQuery('')} aria-label="Clear inventory search">
+              <button className="inventorySearchClear" type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => runQuery('')} aria-label="Clear inventory search">
                 <X size={14} />
               </button>
             ) : (
