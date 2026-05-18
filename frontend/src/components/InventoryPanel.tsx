@@ -243,17 +243,17 @@ export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestC
         <span>
           {loading ? 'Loading' : total === 0 ? 'No matches' : `Page ${currentPage.toLocaleString()} of ${pageCount.toLocaleString()}`}
         </span>
+        {loading && packages.length > 0 ? (
+          <span className="inventoryRefreshStatus">
+            <LoaderCircle className="spin" size={13} />
+            Refreshing
+          </span>
+        ) : null}
         <button className="btn btn-ghost btn-icon" type="button" onClick={() => goPage(1)} disabled={offset + limit >= total} aria-label="Next inventory page">
           <ChevronRight size={15} />
         </button>
       </div>
       <div className="tableWrap inventoryTable">
-        {loading && packages.length > 0 ? (
-          <div className="inventoryLoadingVeil">
-            <LoaderCircle className="spin" size={18} />
-            <span>Refreshing inventory</span>
-          </div>
-        ) : null}
         <table>
           <colgroup>
             <col className="inventoryColEco" />

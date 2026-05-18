@@ -2381,26 +2381,20 @@ button {
   text-align: center;
 }
 
+.inventoryPager .inventoryRefreshStatus {
+  align-items: center;
+  color: var(--fg-3);
+  display: inline-flex;
+  gap: 6px;
+  justify-content: center;
+  min-width: 92px;
+  text-align: left;
+}
+
 .inventoryTable {
   max-height: calc(100vh - 360px);
   overflow: auto;
   position: relative;
-}
-
-.inventoryLoadingVeil {
-  align-items: center;
-  background: color-mix(in srgb, var(--bg-0) 76%, transparent);
-  border: 1px solid var(--bd-1);
-  border-radius: 8px;
-  color: var(--fg-1);
-  display: inline-flex;
-  font-size: 12px;
-  gap: 8px;
-  padding: 8px 10px;
-  position: sticky;
-  right: 12px;
-  top: 10px;
-  z-index: 2;
 }
 
 .inventoryTable table {
