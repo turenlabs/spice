@@ -42,6 +42,7 @@ type FilterMenuItem = {
   label: string;
   token: string;
   meta?: string;
+  value?: string;
 };
 
 type FilterMenuSection = {
@@ -374,8 +375,9 @@ function InventoryFilterMenu({ filterOptions, onSelect }: {
           <div>
             {section.items.map((item) => (
               <button type="button" key={`${section.title}-${item.token}`} onClick={() => onSelect(item.token)}>
+                <span>{item.meta ?? section.title}</span>
                 <b>{item.label}</b>
-                {item.meta ? <em>{item.meta}</em> : null}
+                {item.value ? <em>{item.value}</em> : null}
               </button>
             ))}
           </div>
@@ -436,6 +438,7 @@ function buildFilterMenuSections(filterOptions: Record<FilterKey, FilterOption[]
         label: recipe.label,
         token: recipe.query,
         meta: filterTokenMeta(recipe.query),
+        value: filterTokenValue(recipe.query),
       })),
     },
   ];
@@ -450,6 +453,7 @@ function buildFilterMenuSections(filterOptions: Record<FilterKey, FilterOption[]
     const items = filterOptions[spec.key].slice(0, spec.limit).map((option) => ({
       label: option.label,
       token: `${spec.key}:${quoteFilterValue(option.value)}`,
+      value: option.value,
     }));
     if (items.length > 0) {
       sections.push({ title: spec.title, items });
@@ -463,7 +467,13 @@ function filterTokenMeta(token: string) {
   if (separator <= 0) return token;
   const key = canonicalFilterKey(token.slice(0, separator));
   if (!key) return token;
-  return filterChipLabel({ key, value: token.slice(separator + 1) });
+  return filterKeyLabel(key);
+}
+
+function filterTokenValue(token: string) {
+  const separator = token.indexOf(':');
+  if (separator <= 0) return '';
+  return token.slice(separator + 1);
 }
 
 function binsToOptions(bins: InventoryBin[]) {

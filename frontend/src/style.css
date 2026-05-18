@@ -2168,6 +2168,7 @@ button {
   gap: 8px;
   min-height: 38px;
   padding: 5px 10px;
+  width: 100%;
 }
 
 .inventorySearch:focus-within {
@@ -2180,7 +2181,8 @@ button {
   border: 0;
   color: var(--fg-0);
   flex: 1;
-  min-width: 0;
+  font-size: 13px;
+  min-width: 180px;
   outline: none;
 }
 
@@ -2208,12 +2210,19 @@ button {
   border-radius: 999px;
   color: var(--fg-1);
   cursor: pointer;
+  display: inline-flex;
   gap: 6px;
   font-family: "Geist Mono", monospace;
   font-size: 11px;
   height: 26px;
+  max-width: min(360px, 100%);
+  min-width: 0;
   padding: 0 8px;
   width: auto;
+}
+
+.inventorySearchToken svg {
+  flex: 0 0 auto;
 }
 
 .inventorySearchToken:hover {
@@ -2228,11 +2237,11 @@ button {
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.36);
   color: var(--fg-2);
   display: grid;
-  gap: 10px;
+  gap: 6px;
   left: 0;
   max-height: min(520px, 68vh);
   overflow: auto;
-  padding: 10px;
+  padding: 8px;
   position: absolute;
   right: 0;
   top: calc(100% + 8px);
@@ -2241,7 +2250,8 @@ button {
 
 .inventoryFilterMenuSection {
   display: grid;
-  gap: 6px;
+  gap: 4px;
+  padding: 4px 0;
 }
 
 .inventoryFilterMenuSection > span {
@@ -2250,13 +2260,13 @@ button {
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.08em;
+  padding: 0 8px 2px;
   text-transform: uppercase;
 }
 
 .inventoryFilterMenuSection > div {
   display: grid;
-  gap: 4px;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 2px;
 }
 
 .inventoryFilterMenuSection button {
@@ -2267,11 +2277,11 @@ button {
   color: var(--fg-1);
   cursor: pointer;
   display: grid;
-  gap: 2px;
-  justify-items: start;
-  min-height: 36px;
+  gap: 10px;
+  grid-template-columns: 128px minmax(170px, 1fr) minmax(120px, 0.9fr);
+  min-height: 34px;
   min-width: 0;
-  padding: 7px 8px;
+  padding: 6px 8px;
   text-align: left;
 }
 
@@ -2280,12 +2290,20 @@ button {
   border-color: var(--bd-1);
 }
 
+.inventoryFilterMenuSection button > span,
 .inventoryFilterMenuSection b,
 .inventoryFilterMenuSection em {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.inventoryFilterMenuSection button > span {
+  color: var(--fg-3);
+  font-family: "Geist Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.02em;
 }
 
 .inventoryFilterMenuSection b {
@@ -2299,6 +2317,29 @@ button {
   font-family: "Geist Mono", monospace;
   font-size: 10px;
   font-style: normal;
+  justify-self: end;
+  text-align: right;
+}
+
+@media (max-width: 820px) {
+  .inventoryTools {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .inventoryPageSize {
+    width: 100%;
+  }
+
+  .inventoryFilterMenuSection button {
+    grid-template-columns: 96px minmax(0, 1fr);
+  }
+
+  .inventoryFilterMenuSection em {
+    grid-column: 2;
+    justify-self: start;
+    text-align: left;
+  }
 }
 
 .inventoryPageSize {
