@@ -1,5 +1,5 @@
 import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Copy, FolderSearch, LoaderCircle, Search, X } from 'lucide-react';
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import type { MouseEvent } from 'react';
 import type { InventoryBin, InventoryLocation, InventoryLocationsResult, InventoryRequest, InventoryResult, PackageRef } from '../types';
 
@@ -26,6 +26,13 @@ type LocationState = {
   error?: string;
 };
 
+type FilterKey = 'ecosystem' | 'source' | 'name' | 'version' | 'path';
+
+type FilterOption = {
+  label: string;
+  value: string;
+};
+
 export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestChange, request }: InventoryPanelProps) {
   const packages = inventory.packages ?? [];
   const total = inventory.total ?? 0;
@@ -36,10 +43,19 @@ export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestC
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [locationCache, setLocationCache] = useState<Record<string, LocationState>>({});
   const [queryDraft, setQueryDraft] = useState(request.query);
+  const [filterKey, setFilterKey] = useState<FilterKey>('ecosystem');
+  const filterOptions = useMemo(() => buildFilterOptions(inventory, packages), [inventory, packages]);
+  const selectedFilterOptions = filterOptions[filterKey];
+  const [filterValue, setFilterValue] = useState('');
+  const activeFilters = useMemo(() => structuredFilters(queryDraft), [queryDraft]);
 
   useEffect(() => {
     setQueryDraft(request.query);
   }, [request.query]);
+
+  useEffect(() => {
+    setFilterValue(selectedFilterOptions[0]?.value ?? '');
+  }, [filterKey, selectedFilterOptions]);
 
   useEffect(() => {
     if (queryDraft === request.query) return;
@@ -58,6 +74,19 @@ export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestC
   };
   const addFilterToken = (token: string) => {
     const next = [queryDraft.trim(), token].filter(Boolean).join(' ');
+    setQueryDraft(next);
+    onRequestChange({ ...request, query: next, offset: 0, skipFacets: true });
+  };
+  const applySelectedFilter = () => {
+    const value = filterValue.trim();
+    if (!value) return;
+    const token = `${filterKey}:${quoteFilterValue(value)}`;
+    const next = replaceStructuredFilter(queryDraft, filterKey, token);
+    setQueryDraft(next);
+    onRequestChange({ ...request, query: next, offset: 0, skipFacets: true });
+  };
+  const removeStructuredFilter = (key: FilterKey) => {
+    const next = replaceStructuredFilter(queryDraft, key, '');
     setQueryDraft(next);
     onRequestChange({ ...request, query: next, offset: 0, skipFacets: true });
   };
@@ -158,12 +187,43 @@ export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestC
           Reset
         </button>
       </div>
-      <div className="inventoryQueryHelp" aria-label="Inventory filter examples">
-        <span>Filters</span>
-        {['ecosystem:npm', 'ecosystem:pypi', 'source:package-lock', 'source:requirements', 'name:react', 'version:1.', 'path:node_modules'].map((token) => (
-          <button type="button" key={token} onClick={() => addFilterToken(token)}>{token}</button>
-        ))}
+      <div className="inventoryFilterBuilder" aria-label="Inventory filter builder">
+        <span>Filter</span>
+        <select value={filterKey} onChange={(event) => setFilterKey(event.target.value as FilterKey)} aria-label="Filter key">
+          <option value="ecosystem">Ecosystem</option>
+          <option value="source">Source type</option>
+          <option value="name">Package name</option>
+          <option value="version">Version</option>
+          <option value="path">Path</option>
+        </select>
+        <select value={filterValue} onChange={(event) => setFilterValue(event.target.value)} aria-label="Filter value">
+          {selectedFilterOptions.length === 0 ? (
+            <option value="">No values loaded</option>
+          ) : selectedFilterOptions.map((option) => (
+            <option value={option.value} key={`${filterKey}-${option.value}`}>{option.label}</option>
+          ))}
+        </select>
+        <button type="button" onClick={applySelectedFilter} disabled={!filterValue}>Add filter</button>
+        <button type="button" onClick={() => addFilterToken('path:node_modules')}>path:node_modules</button>
       </div>
+      {activeFilters.length > 0 ? (
+        <div className="inventoryActiveFilters" aria-label="Active inventory filters">
+          <span>Active</span>
+          {activeFilters.map((filter) => (
+            <button type="button" key={filter.key} onClick={() => removeStructuredFilter(filter.key)}>
+              {filter.key}:{filter.value}
+              <X size={12} />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="inventoryQueryHelp" aria-label="Inventory filter examples">
+          <span>Try</span>
+          {['ecosystem:npm', 'ecosystem:pypi', 'source:package-lock', 'source:requirements'].map((token) => (
+            <button type="button" key={token} onClick={() => addFilterToken(token)}>{token}</button>
+          ))}
+        </div>
+      )}
       <InventoryFilter
         active={request.ecosystem}
         bins={inventory.ecosystemCounts ?? []}
@@ -330,6 +390,128 @@ function formatInventoryDate(value: string) {
 function copyPath(event: MouseEvent<HTMLButtonElement>, path: string) {
   event.stopPropagation();
   void navigator.clipboard?.writeText(path);
+}
+
+function buildFilterOptions(inventory: InventoryResult, packages: PackageRef[]): Record<FilterKey, FilterOption[]> {
+  return {
+    ecosystem: binsToOptions(inventory.ecosystemCounts ?? []),
+    source: binsToOptions(inventory.sourceKindCounts ?? []),
+    name: packageFieldOptions(packages, 'name'),
+    version: packageFieldOptions(packages, 'version'),
+    path: packages
+      .map((pkg) => ({ value: pkg.sourcePath, label: compactPath(pkg.sourcePath) }))
+      .filter(uniqueOption)
+      .slice(0, 80),
+  };
+}
+
+function binsToOptions(bins: InventoryBin[]) {
+  return bins
+    .filter((bin) => bin.value)
+    .map((bin) => ({ value: bin.value, label: `${bin.value} (${bin.count.toLocaleString()})` }));
+}
+
+function packageFieldOptions(packages: PackageRef[], field: 'name' | 'version') {
+  return packages
+    .map((pkg) => pkg[field])
+    .filter(Boolean)
+    .map((value) => ({ value, label: value }))
+    .filter(uniqueOption)
+    .slice(0, 80);
+}
+
+function uniqueOption(option: FilterOption, index: number, options: FilterOption[]) {
+  return options.findIndex((candidate) => candidate.value === option.value) === index;
+}
+
+function structuredFilters(query: string): Array<{ key: FilterKey; value: string }> {
+  const filters: Array<{ key: FilterKey; value: string }> = [];
+  for (const token of splitQueryTokens(query)) {
+    const separator = token.indexOf(':');
+    if (separator <= 0) continue;
+    const key = canonicalFilterKey(token.slice(0, separator));
+    if (!key) continue;
+    filters.push({ key, value: unquoteFilterValue(token.slice(separator + 1)) });
+  }
+  return filters;
+}
+
+function replaceStructuredFilter(query: string, key: FilterKey, token: string) {
+  const tokens = splitQueryTokens(query).filter((existing) => {
+    const separator = existing.indexOf(':');
+    if (separator <= 0) return true;
+    return canonicalFilterKey(existing.slice(0, separator)) !== key;
+  });
+  if (token) tokens.push(token);
+  return tokens.join(' ');
+}
+
+function canonicalFilterKey(raw: string): FilterKey | null {
+  switch (raw.trim().toLowerCase()) {
+    case 'ecosystem':
+    case 'eco':
+      return 'ecosystem';
+    case 'source':
+    case 'kind':
+    case 'type':
+      return 'source';
+    case 'name':
+    case 'pkg':
+    case 'package':
+      return 'name';
+    case 'version':
+    case 'ver':
+      return 'version';
+    case 'path':
+    case 'file':
+    case 'location':
+      return 'path';
+    default:
+      return null;
+  }
+}
+
+function splitQueryTokens(query: string) {
+  const tokens: string[] = [];
+  let current = '';
+  let quote = '';
+  let escaped = false;
+  for (const char of query) {
+    if (escaped) {
+      current += char;
+      escaped = false;
+      continue;
+    }
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (char === quote) quote = '';
+      else current += char;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      continue;
+    }
+    if (/\s/.test(char)) {
+      if (current.trim()) tokens.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += char;
+  }
+  if (current.trim()) tokens.push(current.trim());
+  return tokens;
+}
+
+function quoteFilterValue(value: string) {
+  return /\s/.test(value) ? `"${value.replaceAll('"', '\\"')}"` : value;
+}
+
+function unquoteFilterValue(value: string) {
+  return value.replaceAll('\\"', '"');
 }
 
 function InventoryFilter({ active, bins, label, onChange }: {

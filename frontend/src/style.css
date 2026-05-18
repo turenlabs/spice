@@ -2200,6 +2200,70 @@ button {
   padding: 8px 16px;
 }
 
+.inventoryFilterBuilder,
+.inventoryActiveFilters {
+  align-items: center;
+  border-bottom: 1px solid var(--bd-1);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 16px;
+}
+
+.inventoryFilterBuilder span,
+.inventoryActiveFilters span {
+  color: var(--fg-3);
+  font-family: "Geist Mono", monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  margin-right: 2px;
+  text-transform: uppercase;
+}
+
+.inventoryFilterBuilder select {
+  background: var(--bg-1);
+  border: 1px solid var(--bd-1);
+  border-radius: 8px;
+  color: var(--fg-1);
+  height: 32px;
+  max-width: min(340px, 100%);
+  min-width: 142px;
+  outline: none;
+  padding: 0 9px;
+}
+
+.inventoryFilterBuilder button,
+.inventoryActiveFilters button {
+  align-items: center;
+  background: var(--bg-2);
+  border: 1px solid var(--bd-1);
+  border-radius: 999px;
+  color: var(--fg-2);
+  cursor: pointer;
+  display: inline-flex;
+  gap: 6px;
+  font-family: "Geist Mono", monospace;
+  font-size: 11px;
+  height: 30px;
+  padding: 0 10px;
+}
+
+.inventoryFilterBuilder button:hover,
+.inventoryActiveFilters button:hover {
+  border-color: var(--accent);
+  color: var(--fg-0);
+}
+
+.inventoryFilterBuilder button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.inventoryActiveFilters {
+  padding-top: 0;
+}
+
 .inventoryQueryHelp span {
   color: var(--fg-3);
   font-family: "Geist Mono", monospace;
