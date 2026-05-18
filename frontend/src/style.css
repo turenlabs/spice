@@ -2120,6 +2120,12 @@ button {
   padding: 12px 16px;
 }
 
+.inventoryFilterControl {
+  flex: 1 1 520px;
+  min-width: 260px;
+  position: relative;
+}
+
 .spin {
   animation: spin 0.85s linear infinite;
 }
@@ -2158,11 +2164,15 @@ button {
   border-radius: 8px;
   color: var(--fg-2);
   display: flex;
-  flex: 1 1 360px;
+  flex-wrap: wrap;
   gap: 8px;
-  height: 36px;
-  min-width: 240px;
-  padding: 0 10px;
+  min-height: 38px;
+  padding: 5px 10px;
+}
+
+.inventorySearch:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 .inventorySearch input {
@@ -2178,7 +2188,7 @@ button {
   color: var(--fg-3);
 }
 
-.inventorySearch button {
+.inventorySearch > button {
   align-items: center;
   background: transparent;
   border: 0;
@@ -2191,140 +2201,104 @@ button {
   width: 24px;
 }
 
-.inventoryRecipes,
-.inventoryQueryHelp {
+.inventorySearchToken {
   align-items: center;
-  border-bottom: 1px solid var(--bd-1);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 8px 16px;
-}
-
-.inventoryRecipes {
-  background: color-mix(in srgb, var(--bg-1) 72%, transparent);
-  gap: 8px;
-  padding-bottom: 10px;
-  padding-top: 10px;
-}
-
-.inventoryFilterBuilder,
-.inventoryActiveFilters {
-  align-items: center;
-  border-bottom: 1px solid var(--bd-1);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 8px 16px;
-}
-
-.inventoryRecipes span,
-.inventoryFilterBuilder span,
-.inventoryActiveFilters span {
-  color: var(--fg-3);
-  font-family: "Geist Mono", monospace;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  margin-right: 2px;
-  text-transform: uppercase;
-}
-
-.inventoryFilterBuilder select {
-  background: var(--bg-1);
-  border: 1px solid var(--bd-1);
-  border-radius: 8px;
-  color: var(--fg-1);
-  height: 32px;
-  max-width: min(340px, 100%);
-  min-width: 142px;
-  outline: none;
-  padding: 0 9px;
-}
-
-.inventoryRecipes button,
-.inventoryFilterBuilder button,
-.inventoryActiveFilters button {
-  align-items: center;
-  background: var(--bg-2);
-  border: 1px solid var(--bd-1);
-  border-radius: 999px;
-  color: var(--fg-2);
-  cursor: pointer;
-  display: inline-flex;
-  gap: 6px;
-  font-family: "Geist Mono", monospace;
-  font-size: 11px;
-  height: 30px;
-  padding: 0 10px;
-}
-
-.inventoryRecipes button {
   background: color-mix(in srgb, var(--accent) 14%, var(--bg-2));
-  color: var(--fg-1);
-  font-family: inherit;
-  font-size: 12px;
-}
-
-.inventoryRecipes button:first-of-type {
-  border-color: color-mix(in srgb, var(--accent) 58%, var(--bd-1));
-  color: var(--fg-0);
-}
-
-.inventoryRecipes button:hover,
-.inventoryRecipes button:focus-visible,
-.inventoryFilterBuilder button:hover,
-.inventoryActiveFilters button:hover {
-  border-color: var(--accent);
-  color: var(--fg-0);
-}
-
-.inventoryFilterBuilder button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-.inventoryActiveFilters {
-  padding-top: 0;
-}
-
-.inventoryActiveFilters .inventoryClearFilters {
-  background: transparent;
-  border-color: transparent;
-  color: var(--fg-3);
-}
-
-.inventoryActiveFilters .inventoryClearFilters:hover {
-  background: var(--bg-2);
-  border-color: var(--bd-1);
-  color: var(--fg-0);
-}
-
-.inventoryQueryHelp span {
-  color: var(--fg-3);
-  font-family: "Geist Mono", monospace;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  margin-right: 4px;
-  text-transform: uppercase;
-}
-
-.inventoryQueryHelp button {
-  background: var(--bg-2);
   border: 1px solid var(--bd-1);
   border-radius: 999px;
-  color: var(--fg-2);
+  color: var(--fg-1);
   cursor: pointer;
+  gap: 6px;
   font-family: "Geist Mono", monospace;
   font-size: 11px;
   height: 26px;
-  padding: 0 9px;
+  padding: 0 8px;
+  width: auto;
 }
 
-.inventoryQueryHelp button:hover {
+.inventorySearchToken:hover {
   border-color: var(--accent);
   color: var(--fg-0);
+}
+
+.inventoryFilterMenu {
+  background: color-mix(in srgb, var(--bg-1) 94%, black);
+  border: 1px solid var(--bd-1);
+  border-radius: 8px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.36);
+  color: var(--fg-2);
+  display: grid;
+  gap: 10px;
+  left: 0;
+  max-height: min(520px, 68vh);
+  overflow: auto;
+  padding: 10px;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 20;
+}
+
+.inventoryFilterMenuSection {
+  display: grid;
+  gap: 6px;
+}
+
+.inventoryFilterMenuSection > span {
+  color: var(--fg-3);
+  font-family: "Geist Mono", monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.inventoryFilterMenuSection > div {
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.inventoryFilterMenuSection button {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--fg-1);
+  cursor: pointer;
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  min-height: 36px;
+  min-width: 0;
+  padding: 7px 8px;
+  text-align: left;
+}
+
+.inventoryFilterMenuSection button:hover {
+  background: var(--bg-2);
+  border-color: var(--bd-1);
+}
+
+.inventoryFilterMenuSection b,
+.inventoryFilterMenuSection em {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inventoryFilterMenuSection b {
+  color: var(--fg-0);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.inventoryFilterMenuSection em {
+  color: var(--fg-3);
+  font-family: "Geist Mono", monospace;
+  font-size: 10px;
+  font-style: normal;
 }
 
 .inventoryPageSize {

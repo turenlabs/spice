@@ -38,6 +38,17 @@ type InventoryRecipe = {
   query: string;
 };
 
+type FilterMenuItem = {
+  label: string;
+  token: string;
+  meta?: string;
+};
+
+type FilterMenuSection = {
+  title: string;
+  items: FilterMenuItem[];
+};
+
 const inventoryRecipes: InventoryRecipe[] = [
   { label: 'JavaScript packages', query: 'ecosystem:npm' },
   { label: 'Python packages', query: 'ecosystem:pypi' },
@@ -56,19 +67,14 @@ export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestC
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [locationCache, setLocationCache] = useState<Record<string, LocationState>>({});
   const [queryDraft, setQueryDraft] = useState(request.query);
-  const [filterKey, setFilterKey] = useState<FilterKey>('ecosystem');
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false);
   const filterOptions = useMemo(() => buildFilterOptions(inventory, packages), [inventory, packages]);
-  const selectedFilterOptions = filterOptions[filterKey];
-  const [filterValue, setFilterValue] = useState('');
   const activeFilters = useMemo(() => structuredFilters(queryDraft), [queryDraft]);
+  const freeTextDraft = useMemo(() => freeTextQuery(queryDraft), [queryDraft]);
 
   useEffect(() => {
     setQueryDraft(request.query);
   }, [request.query]);
-
-  useEffect(() => {
-    setFilterValue(selectedFilterOptions[0]?.value ?? '');
-  }, [filterKey, selectedFilterOptions]);
 
   useEffect(() => {
     if (queryDraft === request.query) return;
@@ -92,9 +98,6 @@ export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestC
       skipFacets: !facets,
     });
   };
-  const resetFilters = () => {
-    runQuery('', true);
-  };
   const addFilterToken = (token: string) => {
     const separator = token.indexOf(':');
     const key = separator > 0 ? canonicalFilterKey(token.slice(0, separator)) : null;
@@ -103,16 +106,16 @@ export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestC
       : [queryDraft.trim(), token].filter(Boolean).join(' ');
     runQuery(next);
   };
-  const applySelectedFilter = () => {
-    const value = filterValue.trim();
-    if (!value) return;
-    const token = `${filterKey}:${quoteFilterValue(value)}`;
-    const next = replaceStructuredFilter(queryDraft, filterKey, token);
-    runQuery(next);
-  };
   const removeStructuredFilter = (key: FilterKey) => {
     const next = replaceStructuredFilter(queryDraft, key, '');
     runQuery(next);
+  };
+  const updateFreeText = (value: string) => {
+    const filters = structuredFilters(queryDraft).map(filterToken).join(' ');
+    setQueryDraft([filters, value].map((part) => part.trim()).filter(Boolean).join(' '));
+  };
+  const closeFilterMenu = () => {
+    window.setTimeout(() => setFilterMenuOpen(false), 120);
   };
   const goPage = (direction: -1 | 1) => {
     const nextOffset = Math.max(0, Math.min(Math.max(total - limit, 0), offset + direction * limit));
@@ -178,31 +181,48 @@ export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestC
         </div>
         <span>{loading ? <><LoaderCircle className="spin inlineSpin" size={13} /> Loading</> : `${total.toLocaleString()} rows`}</span>
       </div>
-      <div className="inventoryRecipes" aria-label="Inventory starter filters">
-        <span>Start with</span>
-        {inventoryRecipes.map((recipe) => (
-          <button type="button" key={recipe.query} onClick={() => runQuery(recipe.query)}>
-            {recipe.label}
-          </button>
-        ))}
-      </div>
       <div className="inventoryTools">
-        <label className="inventorySearch">
-          <Search size={15} />
-          <input
-            value={queryDraft}
-            onChange={(event) => setQueryDraft(event.target.value)}
-            placeholder="Search package names, versions, or paths"
-            spellCheck={false}
-          />
-          {queryDraft ? (
-            <button type="button" onClick={() => {
-              runQuery('');
-            }} aria-label="Clear inventory search">
-              <X size={14} />
-            </button>
+        <div className="inventoryFilterControl">
+          <div className="inventorySearch" onClick={() => setFilterMenuOpen(true)} onBlur={closeFilterMenu}>
+            <Search size={15} />
+            {activeFilters.map((filter) => (
+              <button
+                className="inventorySearchToken"
+                type="button"
+                key={filter.key}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => removeStructuredFilter(filter.key)}
+                title="Remove filter"
+              >
+                {filterChipLabel(filter)}
+                <X size={12} />
+              </button>
+            ))}
+            <input
+              value={freeTextDraft}
+              onChange={(event) => updateFreeText(event.target.value)}
+              onFocus={() => setFilterMenuOpen(true)}
+              placeholder={activeFilters.length > 0 ? 'Search within results' : 'Filter inventory'}
+              spellCheck={false}
+            />
+            {queryDraft ? (
+              <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => runQuery('')} aria-label="Clear inventory search">
+                <X size={14} />
+              </button>
+            ) : (
+              <ChevronDown size={14} />
+            )}
+          </div>
+          {filterMenuOpen ? (
+            <InventoryFilterMenu
+              filterOptions={filterOptions}
+              onSelect={(token) => {
+                addFilterToken(token);
+                setFilterMenuOpen(false);
+              }}
+            />
           ) : null}
-        </label>
+        </div>
         <select
           className="inventoryPageSize"
           value={request.limit}
@@ -214,50 +234,7 @@ export function InventoryPanel({ inventory, loading, onLoadLocations, onRequestC
           <option value={250}>250 rows</option>
           <option value={500}>500 rows</option>
         </select>
-        <button className="chip" type="button" onClick={resetFilters} disabled={!queryDraft && request.ecosystem === 'all' && request.sourceKind === 'all'}>
-          Reset
-        </button>
       </div>
-      <div className="inventoryFilterBuilder" aria-label="Inventory filter builder">
-        <span>Add filter</span>
-        <select value={filterKey} onChange={(event) => setFilterKey(event.target.value as FilterKey)} aria-label="Filter key">
-          <option value="ecosystem">Ecosystem</option>
-          <option value="source">Source type</option>
-          <option value="name">Package name</option>
-          <option value="version">Version</option>
-          <option value="path">Path</option>
-        </select>
-        <select value={filterValue} onChange={(event) => setFilterValue(event.target.value)} aria-label="Filter value">
-          {selectedFilterOptions.length === 0 ? (
-            <option value="">No values loaded</option>
-          ) : selectedFilterOptions.map((option) => (
-            <option value={option.value} key={`${filterKey}-${option.value}`}>{option.label}</option>
-          ))}
-        </select>
-        <button type="button" onClick={applySelectedFilter} disabled={!filterValue}>Apply</button>
-        <button type="button" onClick={() => addFilterToken('path:node_modules')}>Path contains node_modules</button>
-      </div>
-      {activeFilters.length > 0 ? (
-        <div className="inventoryActiveFilters" aria-label="Active inventory filters">
-          <span>Active</span>
-          {activeFilters.map((filter) => (
-            <button type="button" key={filter.key} onClick={() => removeStructuredFilter(filter.key)}>
-              {filterChipLabel(filter)}
-              <X size={12} />
-            </button>
-          ))}
-          <button className="inventoryClearFilters" type="button" onClick={resetFilters}>
-            Clear all
-          </button>
-        </div>
-      ) : (
-        <div className="inventoryQueryHelp" aria-label="Inventory filter examples">
-          <span>Examples</span>
-          {['ecosystem:npm', 'ecosystem:pypi', 'source:package-lock', 'source:requirements'].map((token) => (
-            <button type="button" key={token} onClick={() => addFilterToken(token)}>{token}</button>
-          ))}
-        </div>
-      )}
       <div className="inventoryPager">
         <button className="btn btn-ghost btn-icon" type="button" onClick={() => goPage(-1)} disabled={offset === 0} aria-label="Previous inventory page">
           <ChevronLeft size={15} />
@@ -384,6 +361,30 @@ function InventoryDetails({ details, pkg }: { details?: LocationState; pkg: Pack
   );
 }
 
+function InventoryFilterMenu({ filterOptions, onSelect }: {
+  filterOptions: Record<FilterKey, FilterOption[]>;
+  onSelect: (token: string) => void;
+}) {
+  const sections = buildFilterMenuSections(filterOptions);
+  return (
+    <div className="inventoryFilterMenu" onMouseDown={(event) => event.preventDefault()}>
+      {sections.map((section) => (
+        <div className="inventoryFilterMenuSection" key={section.title}>
+          <span>{section.title}</span>
+          <div>
+            {section.items.map((item) => (
+              <button type="button" key={`${section.title}-${item.token}`} onClick={() => onSelect(item.token)}>
+                <b>{item.label}</b>
+                {item.meta ? <em>{item.meta}</em> : null}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function packageKey(pkg: PackageRef) {
   return [pkg.ecosystem, pkg.name, pkg.version, pkg.sourceKind, pkg.sourceId || pkg.sourcePath].join('\0');
 }
@@ -427,6 +428,44 @@ function buildFilterOptions(inventory: InventoryResult, packages: PackageRef[]):
   };
 }
 
+function buildFilterMenuSections(filterOptions: Record<FilterKey, FilterOption[]>): FilterMenuSection[] {
+  const sections: FilterMenuSection[] = [
+    {
+      title: 'Suggested',
+      items: inventoryRecipes.map((recipe) => ({
+        label: recipe.label,
+        token: recipe.query,
+        meta: filterTokenMeta(recipe.query),
+      })),
+    },
+  ];
+  const specs: Array<{ title: string; key: FilterKey; limit: number }> = [
+    { title: 'Ecosystem', key: 'ecosystem', limit: 8 },
+    { title: 'Source type', key: 'source', limit: 8 },
+    { title: 'Package name', key: 'name', limit: 10 },
+    { title: 'Version', key: 'version', limit: 8 },
+    { title: 'Path contains', key: 'path', limit: 8 },
+  ];
+  for (const spec of specs) {
+    const items = filterOptions[spec.key].slice(0, spec.limit).map((option) => ({
+      label: option.label,
+      token: `${spec.key}:${quoteFilterValue(option.value)}`,
+    }));
+    if (items.length > 0) {
+      sections.push({ title: spec.title, items });
+    }
+  }
+  return sections;
+}
+
+function filterTokenMeta(token: string) {
+  const separator = token.indexOf(':');
+  if (separator <= 0) return token;
+  const key = canonicalFilterKey(token.slice(0, separator));
+  if (!key) return token;
+  return filterChipLabel({ key, value: token.slice(separator + 1) });
+}
+
 function binsToOptions(bins: InventoryBin[]) {
   return bins
     .filter((bin) => bin.value)
@@ -466,6 +505,18 @@ function replaceStructuredFilter(query: string, key: FilterKey, token: string) {
   });
   if (token) tokens.push(token);
   return tokens.join(' ');
+}
+
+function freeTextQuery(query: string) {
+  return splitQueryTokens(query).filter((token) => {
+    const separator = token.indexOf(':');
+    if (separator <= 0) return true;
+    return canonicalFilterKey(token.slice(0, separator)) === null;
+  }).join(' ');
+}
+
+function filterToken(filter: { key: FilterKey; value: string }) {
+  return `${filter.key}:${quoteFilterValue(filter.value)}`;
 }
 
 function canonicalFilterKey(raw: string): FilterKey | null {
