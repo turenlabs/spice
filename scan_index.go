@@ -509,8 +509,13 @@ func inventoryWhere(req InventoryRequest) (string, []any) {
 			clauses = append(clauses, `source_kind LIKE ? ESCAPE '\' COLLATE NOCASE`)
 			args = append(args, inventoryLike(filter.Value))
 		case "source_path":
-			clauses = append(clauses, `source_path LIKE ? ESCAPE '\' COLLATE NOCASE`)
-			args = append(args, inventoryLike(filter.Value))
+			if match := inventoryPathFTSQuery(filter.Value); match != "" {
+				clauses = append(clauses, `id IN (SELECT rowid FROM package_inventory_fts WHERE package_inventory_fts MATCH ?)`)
+				args = append(args, match)
+			} else {
+				clauses = append(clauses, `source_path LIKE ? ESCAPE '\' COLLATE NOCASE`)
+				args = append(args, inventoryLike(filter.Value))
+			}
 		case "source_sha256":
 			clauses = append(clauses, `source_sha256 LIKE ? ESCAPE '\' COLLATE NOCASE`)
 			args = append(args, inventoryLike(filter.Value))
@@ -638,6 +643,27 @@ func inventoryFTSQuery(terms []string) string {
 		}
 	}
 	return strings.Join(parts, " AND ")
+}
+
+func inventoryPathFTSQuery(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	pieces := make([]string, 0, 2)
+	for _, piece := range strings.FieldsFunc(value, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	}) {
+		piece = strings.TrimSpace(piece)
+		if len([]rune(piece)) < 3 {
+			return ""
+		}
+		pieces = append(pieces, quoteFTSTerm(piece)+"*")
+	}
+	if len(pieces) == 0 {
+		return ""
+	}
+	return "source_path : (" + strings.Join(pieces, " AND ") + ")"
 }
 
 func quoteFTSTerm(term string) string {

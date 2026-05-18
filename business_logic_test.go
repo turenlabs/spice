@@ -529,6 +529,7 @@ func TestInventoryDeduplicatesBySourceDigestAndAppliesFilters(t *testing.T) {
 		inventoryWrite(filepath.Join(dir, "a", "package.json"), sameDigest, PackageRef{Ecosystem: "npm", Name: "left-pad", Version: "1.3.0", SourceKind: "dependencies"}),
 		inventoryWrite(filepath.Join(dir, "b", "package.json"), sameDigest, PackageRef{Ecosystem: "npm", Name: "left-pad", Version: "1.3.0", SourceKind: "dependencies"}),
 		inventoryWrite(filepath.Join(dir, "c", "package.json"), differentDigest, PackageRef{Ecosystem: "npm", Name: "left-pad", Version: "1.3.0", SourceKind: "dependencies"}),
+		inventoryWrite(filepath.Join(dir, "project", "node_modules", "react", "package.json"), HashBytes([]byte("react lock content")), PackageRef{Ecosystem: "npm", Name: "react", Version: "19.0.0", SourceKind: "dependencies"}),
 		inventoryWrite(filepath.Join(dir, "requirements.txt"), HashBytes([]byte("requests==2.32.0")), PackageRef{Ecosystem: "pypi", Name: "requests", Version: "2.32.0", SourceKind: "requirements"}),
 	}
 	if err := index.UpsertBatch(writes, "test-engine"); err != nil {
@@ -539,7 +540,7 @@ func TestInventoryDeduplicatesBySourceDigestAndAppliesFilters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if all.Total != 3 || len(all.Packages) != 3 {
+	if all.Total != 4 || len(all.Packages) != 4 {
 		t.Fatalf("expected inventory to dedupe same package from same source digest, got total=%d packages=%#v", all.Total, all.Packages)
 	}
 
@@ -596,9 +597,9 @@ func TestInventoryDeduplicatesBySourceDigestAndAppliesFilters(t *testing.T) {
 			t.Fatalf("expected location source digest %q, got %#v", duplicateSource.SourceID, location)
 		}
 	}
-	assertInventoryBin(t, all.EcosystemCounts, "npm", 2)
+	assertInventoryBin(t, all.EcosystemCounts, "npm", 3)
 	assertInventoryBin(t, all.EcosystemCounts, "pypi", 1)
-	assertInventoryBin(t, all.SourceKindCounts, "dependencies", 2)
+	assertInventoryBin(t, all.SourceKindCounts, "dependencies", 3)
 	assertInventoryBin(t, all.SourceKindCounts, "requirements", 1)
 
 	withoutFacets, err := index.ListPackageInventory(InventoryRequest{Limit: 10, SkipFacets: true})
@@ -618,6 +619,17 @@ func TestInventoryDeduplicatesBySourceDigestAndAppliesFilters(t *testing.T) {
 	}
 	if structured.Total != 1 || len(structured.Packages) != 1 || !strings.Contains(structured.Packages[0].SourcePath, string(filepath.Separator)+"a"+string(filepath.Separator)) {
 		t.Fatalf("expected structured inventory query to filter by ecosystem/name/source/path, got total=%d packages=%#v", structured.Total, structured.Packages)
+	}
+
+	pathFTS, err := index.ListPackageInventory(InventoryRequest{
+		Limit: 10,
+		Query: `path:node_modules`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pathFTS.Total != 1 || len(pathFTS.Packages) != 1 || pathFTS.Packages[0].Name != "react" {
+		t.Fatalf("expected path:node_modules to use path-scoped indexed search, got total=%d packages=%#v", pathFTS.Total, pathFTS.Packages)
 	}
 
 	quoted, err := index.ListPackageInventory(InventoryRequest{
