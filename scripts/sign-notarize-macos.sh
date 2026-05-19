@@ -18,12 +18,30 @@ require_env() {
 for name in \
   APPLE_CERTIFICATE_P12_BASE64 \
   APPLE_CERTIFICATE_PASSWORD \
-  APPLE_CODESIGN_IDENTITY \
-  APPLE_NOTARY_KEY_P8_BASE64 \
-  APPLE_NOTARY_KEY_ID \
-  APPLE_NOTARY_ISSUER_ID; do
+  APPLE_CODESIGN_IDENTITY; do
   require_env "$name"
 done
+
+if [[ -n "${APPLE_NOTARY_KEY_P8_BASE64:-}" || -n "${APPLE_NOTARY_KEY_ID:-}" || -n "${APPLE_NOTARY_ISSUER_ID:-}" ]]; then
+  for name in \
+    APPLE_NOTARY_KEY_P8_BASE64 \
+    APPLE_NOTARY_KEY_ID \
+    APPLE_NOTARY_ISSUER_ID; do
+    require_env "$name"
+  done
+  notary_auth="api-key"
+elif [[ -n "${APPLE_ID:-}" || -n "${APPLE_ID_PASSWORD:-}" || -n "${APPLE_TEAM_ID:-}" ]]; then
+  for name in \
+    APPLE_ID \
+    APPLE_ID_PASSWORD \
+    APPLE_TEAM_ID; do
+    require_env "$name"
+  done
+  notary_auth="apple-id"
+else
+  printf "Missing notarization credentials. Set either APPLE_NOTARY_KEY_* secrets or APPLE_ID, APPLE_ID_PASSWORD, and APPLE_TEAM_ID.\n" >&2
+  exit 1
+fi
 
 if [[ ! -d "$APP_BUNDLE" ]]; then
   printf "App bundle not found: %s\n" "$APP_BUNDLE" >&2
@@ -44,8 +62,11 @@ cleanup() {
 trap cleanup EXIT
 
 printf "%s" "$APPLE_CERTIFICATE_P12_BASE64" | /usr/bin/base64 -D > "$p12"
-printf "%s" "$APPLE_NOTARY_KEY_P8_BASE64" | /usr/bin/base64 -D > "$notary_key"
-chmod 600 "$p12" "$notary_key"
+if [[ "$notary_auth" == "api-key" ]]; then
+  printf "%s" "$APPLE_NOTARY_KEY_P8_BASE64" | /usr/bin/base64 -D > "$notary_key"
+  chmod 600 "$notary_key"
+fi
+chmod 600 "$p12"
 
 security create-keychain -p "$keychain_password" "$keychain"
 security set-keychain-settings -lut 21600 "$keychain"
@@ -83,11 +104,19 @@ printf "Creating notarization archive\n"
 ditto -c -k --keepParent "$APP_BUNDLE" "$notary_zip"
 
 printf "Submitting notarization request\n"
-xcrun notarytool submit "$notary_zip" \
-  --key "$notary_key" \
-  --key-id "$APPLE_NOTARY_KEY_ID" \
-  --issuer "$APPLE_NOTARY_ISSUER_ID" \
-  --wait
+if [[ "$notary_auth" == "api-key" ]]; then
+  xcrun notarytool submit "$notary_zip" \
+    --key "$notary_key" \
+    --key-id "$APPLE_NOTARY_KEY_ID" \
+    --issuer "$APPLE_NOTARY_ISSUER_ID" \
+    --wait
+else
+  xcrun notarytool submit "$notary_zip" \
+    --apple-id "$APPLE_ID" \
+    --password "$APPLE_ID_PASSWORD" \
+    --team-id "$APPLE_TEAM_ID" \
+    --wait
+fi
 
 printf "Stapling notarization ticket\n"
 xcrun stapler staple "$APP_BUNDLE"

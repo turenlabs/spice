@@ -59,20 +59,51 @@ jobs:
           APPLE_NOTARY_KEY_P8_BASE64: ${{ secrets.APPLE_NOTARY_KEY_P8_BASE64 }}
           APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
           APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
-          missing=()
+          signing_missing=()
           for name in \
             APPLE_CERTIFICATE_P12_BASE64 \
             APPLE_CERTIFICATE_PASSWORD \
-            APPLE_CODESIGN_IDENTITY \
+            APPLE_CODESIGN_IDENTITY; do
+            if [[ -z "${!name:-}" ]]; then
+              signing_missing+=("$name")
+            fi
+          done
+
+          api_key_missing=()
+          for name in \
             APPLE_NOTARY_KEY_P8_BASE64 \
             APPLE_NOTARY_KEY_ID \
             APPLE_NOTARY_ISSUER_ID; do
             if [[ -z "${!name:-}" ]]; then
-              missing+=("$name")
+              api_key_missing+=("$name")
             fi
           done
+
+          apple_id_missing=()
+          for name in \
+            APPLE_ID \
+            APPLE_ID_PASSWORD \
+            APPLE_TEAM_ID; do
+            if [[ -z "${!name:-}" ]]; then
+              apple_id_missing+=("$name")
+            fi
+          done
+
+          missing=("${signing_missing[@]}")
+          if (( ${#api_key_missing[@]} == 0 )); then
+            echo "notary_auth=api-key" >> "$GITHUB_OUTPUT"
+          elif (( ${#apple_id_missing[@]} == 0 )); then
+            echo "notary_auth=apple-id" >> "$GITHUB_OUTPUT"
+          else
+            missing+=("${api_key_missing[@]}")
+            missing+=("or APPLE_ID, APPLE_ID_PASSWORD, APPLE_TEAM_ID")
+          fi
+
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             if (( ${#missing[@]} > 0 )); then
               printf "Missing Apple signing secrets for tag release:\n" >&2
@@ -99,6 +130,9 @@ jobs:
           APPLE_NOTARY_KEY_P8_BASE64: ${{ secrets.APPLE_NOTARY_KEY_P8_BASE64 }}
           APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
           APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: scripts/sign-notarize-macos.sh
 
       - name: Package unsigned macOS app
