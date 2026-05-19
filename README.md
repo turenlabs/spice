@@ -14,7 +14,15 @@ Spice is a best-effort local detection tool. It can help find known indicators, 
 
 ## Run
 
-Install the CLI with Homebrew:
+Install the signed macOS desktop app and CLI with Homebrew:
+
+```bash
+brew tap turenlabs/tap
+brew install --cask turenlabs/tap/spice
+spice version
+```
+
+Install only the CLI:
 
 ```bash
 brew tap turenlabs/tap
@@ -22,7 +30,7 @@ brew install turenlabs/tap/spice
 spice version
 ```
 
-Download the signed macOS app bundle from the [latest GitHub release](https://github.com/turenlabs/spice/releases/latest).
+You can also download the signed macOS app bundle from the [latest GitHub release](https://github.com/turenlabs/spice/releases/latest).
 
 Run the desktop app from source:
 
