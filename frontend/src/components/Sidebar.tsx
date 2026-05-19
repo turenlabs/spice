@@ -1,4 +1,4 @@
-import { FileWarning, HardDrive, PackageSearch, Settings2 } from 'lucide-react';
+import { FileWarning, HardDrive, PackageSearch, Settings2, ShieldCheck } from 'lucide-react';
 import type { Mode } from '../types';
 import spiceLogo from '../assets/spice-logo.png';
 
@@ -23,6 +23,10 @@ export function Sidebar({ mode, onModeChange }: {
         <button className="side-btn" data-active={mode === 'inventory'} type="button" onClick={() => onModeChange('inventory')} aria-label="Inventory">
           <PackageSearch size={20} />
           <span className="side-tip">Inventory</span>
+        </button>
+        <button className="side-btn" data-active={mode === 'harden'} type="button" onClick={() => onModeChange('harden')} aria-label="Harden">
+          <ShieldCheck size={20} />
+          <span className="side-tip">Harden</span>
         </button>
         <div className="side-spacer" />
         <button className="side-btn" data-active={mode === 'settings'} type="button" onClick={() => onModeChange('settings')} aria-label="Settings">

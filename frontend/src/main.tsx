@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { FindingsTable } from './components/FindingsTable';
+import { HardenPanel } from './components/HardenPanel';
 import { InventoryPanel } from './components/InventoryPanel';
 import { PreviewPane } from './components/PreviewPane';
 import { ScanStrip } from './components/ScanStrip';
@@ -14,6 +15,7 @@ import type {
   FilePreview,
   Finding,
   FindingAction,
+  HardenStatus,
   InventoryLocationRequest,
   InventoryLocationsResult,
   InventoryRequest,
@@ -55,6 +57,8 @@ declare global {
           Settings: () => Promise<AppSettings>;
           SaveSettings: (settings: AppSettings) => Promise<AppSettings>;
           ClearLocalData: () => Promise<void>;
+          HardenStatus: () => Promise<HardenStatus>;
+          ApplyHardenPreset: (request: { preset: string }) => Promise<HardenStatus>;
         };
       };
     };
@@ -97,7 +101,7 @@ function App() {
   const [scanCompletedThisSession, setScanCompletedThisSession] = useState(false);
   const [liveFindings, setLiveFindings] = useState<Finding[]>([]);
   const [scanProgress, setScanProgress] = useState<ScanProgress | null>(null);
-  const [busy, setBusy] = useState<'scan' | 'detections' | 'clear' | null>(null);
+  const [busy, setBusy] = useState<'scan' | 'detections' | 'clear' | 'harden' | null>(null);
   const [error, setError] = useState('');
   const [findingActions, setFindingActions] = useState<Record<string, FindingAction>>(() => loadFindingActions());
   const [preview, setPreview] = useState<FilePreview | null>(null);
@@ -109,6 +113,8 @@ function App() {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [clearProgress, setClearProgress] = useState<ClearLocalDataProgress | null>(null);
   const [clearLog, setClearLog] = useState<string[]>([]);
+  const [hardenStatus, setHardenStatus] = useState<HardenStatus | null>(null);
+  const [hardenPreset, setHardenPreset] = useState('recommended');
 
   const paths = useMemo(() => pathText.split(/[\n,]/).map((path) => path.trim()).filter(Boolean), [pathText]);
   const hasWails = Boolean(api());
@@ -138,6 +144,12 @@ function App() {
       if (result?.finishedAt) {
         setScanResult(result);
         setLiveFindings(result.findings ?? []);
+      }
+    }).catch(() => undefined);
+    api()?.HardenStatus().then((status) => {
+      setHardenStatus(status);
+      if (status?.npm?.activePreset && status.npm.activePreset !== 'custom') {
+        setHardenPreset(status.npm.activePreset);
       }
     }).catch(() => undefined);
   }, [hasWails]);
@@ -383,6 +395,38 @@ function App() {
     setScanProgress((current) => current ? { ...current, status: 'Stopping after current files', running: true } : current);
   }
 
+  async function refreshHardenStatus() {
+    if (!api()) return;
+    setError('');
+    try {
+      const status = await api()!.HardenStatus();
+      setHardenStatus(status);
+      if (status?.npm?.activePreset && status.npm.activePreset !== 'custom') {
+        setHardenPreset(status.npm.activePreset);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function applyHardenPreset() {
+    if (!api()) return;
+    setBusy('harden');
+    setError('');
+    try {
+      const status = await api()!.ApplyHardenPreset({ preset: hardenPreset });
+      setHardenStatus(status);
+      if (status?.npm?.activePreset && status.npm.activePreset !== 'custom') {
+        setHardenPreset(status.npm.activePreset);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      await refreshHardenStatus();
+    } finally {
+      setBusy(null);
+    }
+  }
+
   function chooseScanProfile(profile: ScanProfile) {
     setScanProfile(profile);
     setPathText(defaultScanScopes[profile]);
@@ -472,6 +516,15 @@ function App() {
                 request={inventoryRequest}
                 onLoadLocations={loadInventoryLocations}
                 onRequestChange={setInventoryRequest}
+              />
+            ) : mode === 'harden' ? (
+              <HardenPanel
+                applying={busy === 'harden'}
+                selectedPreset={hardenPreset}
+                status={hardenStatus}
+                onApply={applyHardenPreset}
+                onRefresh={refreshHardenStatus}
+                onSelectPreset={setHardenPreset}
               />
             ) : mode === 'findings' ? (
               <>

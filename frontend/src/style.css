@@ -3145,6 +3145,256 @@ td,
   color: var(--fg-1);
 }
 
+.hardenPage {
+  display: grid;
+  gap: 18px;
+}
+
+.hardenHero {
+  align-items: flex-start;
+  border-bottom: 1px solid var(--bd-1);
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding-bottom: 20px;
+}
+
+.hardenHero h1 {
+  color: var(--fg-0);
+  font-size: 34px;
+  line-height: 1.05;
+  margin: 6px 0 10px;
+}
+
+.hardenHero p {
+  color: var(--fg-2);
+  line-height: 1.5;
+  max-width: 72ch;
+}
+
+.hardenHeroActions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.hardenGrid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+}
+
+.hardenCard {
+  background: var(--bg-2);
+  border: 1px solid var(--bd-1);
+  border-radius: 12px;
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.hardenWide {
+  grid-row: span 2;
+}
+
+.hardenCardHead {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.hardenCardHead h2 {
+  color: var(--fg-0);
+  font-size: 17px;
+  margin-bottom: 5px;
+}
+
+.hardenCardHead p {
+  color: var(--fg-2);
+  font-size: 12.5px;
+}
+
+.hardenCardHead svg {
+  color: var(--ember);
+  flex-shrink: 0;
+}
+
+.hardenStatusPill {
+  background: rgba(255, 106, 44, 0.08);
+  border: 1px solid rgba(255, 106, 44, 0.28);
+  border-radius: 999px;
+  color: var(--ember);
+  font-size: 11.5px;
+  padding: 6px 9px;
+  text-transform: capitalize;
+}
+
+.hardenPresetGrid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.hardenPreset {
+  align-items: start;
+  background: var(--bg-1);
+  border: 1px solid var(--bd-1);
+  border-radius: 10px;
+  color: var(--fg-2);
+  cursor: pointer;
+  display: grid;
+  gap: 7px;
+  min-height: 132px;
+  padding: 14px;
+  text-align: left;
+}
+
+.hardenPreset[data-active="true"] {
+  background: rgba(255, 106, 44, 0.08);
+  border-color: rgba(255, 106, 44, 0.55);
+}
+
+.hardenRadio {
+  border: 1px solid var(--bd-2);
+  border-radius: 50%;
+  display: block;
+  height: 16px;
+  position: relative;
+  width: 16px;
+}
+
+.hardenPreset[data-active="true"] .hardenRadio {
+  border-color: var(--ember);
+}
+
+.hardenPreset[data-active="true"] .hardenRadio::after {
+  background: var(--ember);
+  border-radius: 50%;
+  content: "";
+  height: 8px;
+  left: 3px;
+  position: absolute;
+  top: 3px;
+  width: 8px;
+}
+
+.hardenPreset strong {
+  color: var(--fg-0);
+  font-size: 13px;
+}
+
+.hardenPreset em {
+  color: var(--fg-2);
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.4;
+}
+
+.hardenCommandBox {
+  background: #070b11;
+  border: 1px solid var(--bd-1);
+  border-radius: 10px;
+  display: grid;
+  gap: 9px;
+  padding: 13px;
+}
+
+.hardenCommandBox code {
+  color: var(--fg-1);
+  font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.hardenSettings {
+  display: grid;
+  gap: 8px;
+}
+
+.hardenSetting {
+  align-items: center;
+  background: var(--bg-1);
+  border: 1px solid var(--bd-1);
+  border-radius: 9px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 18px minmax(0, 1fr) minmax(72px, auto);
+  min-height: 56px;
+  padding: 10px 12px;
+}
+
+.hardenSetting > svg {
+  color: var(--amber);
+}
+
+.hardenSetting[data-status="ok"] > svg {
+  color: var(--sage);
+}
+
+.hardenSetting strong,
+.hardenSetting span {
+  display: block;
+}
+
+.hardenSetting strong {
+  color: var(--fg-0);
+  font-size: 12.5px;
+}
+
+.hardenSetting span {
+  color: var(--fg-2);
+  font-size: 12px;
+  line-height: 1.35;
+  margin-top: 3px;
+}
+
+.hardenSetting code {
+  background: var(--bg-3);
+  border: 1px solid var(--bd-1);
+  border-radius: 999px;
+  color: var(--fg-1);
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-size: 11.5px;
+  justify-self: end;
+  max-width: 180px;
+  overflow: hidden;
+  padding: 5px 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hardenList {
+  color: var(--fg-2);
+  display: grid;
+  font-size: 12.5px;
+  gap: 9px;
+  line-height: 1.45;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.hardenList b,
+.hardenList code {
+  color: var(--fg-0);
+}
+
+.hardenNotice {
+  align-items: center;
+  border: 1px solid var(--bd-1);
+  border-radius: 9px;
+  display: flex;
+  gap: 9px;
+  padding: 10px 12px;
+}
+
+.hardenNotice.danger {
+  background: rgba(255, 82, 38, 0.08);
+  border-color: rgba(255, 82, 38, 0.35);
+  color: #ffb29e;
+}
+
 @media (max-width: 980px) {
   body {
     overflow: auto;
@@ -3176,9 +3426,19 @@ td,
   .scan-row,
   .scan-type-grid,
   .live,
-  .findingsIntro {
+  .findingsIntro,
+  .hardenHero {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .hardenGrid,
+  .hardenPresetGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .hardenHeroActions {
+    flex-wrap: wrap;
   }
 
   .scan-type-grid {

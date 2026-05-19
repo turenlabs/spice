@@ -51,6 +51,7 @@ Use the desktop app when you want to:
 - Review findings with file previews.
 - Ignore or restore findings during triage.
 - Browse the local package inventory.
+- Apply npm install guardrails from the Harden page.
 - Exclude noisy directories from future scans.
 - Clear local scan data from settings.
 
@@ -63,6 +64,26 @@ Recommended first scan:
 5. Open **Inventory** if you want to inspect packages Spice discovered.
 
 Use **Deep disk scan** only when you want a broader pass over selected paths. It reads more files and takes longer.
+
+## Harden Package Installs
+
+The **Harden** page helps developers apply reversible npm guardrails:
+
+- `min-release-age`: avoid npm versions published too recently.
+- `save-exact`: save exact versions for new installs.
+- `allow-git`: block Git dependency specs during npm install.
+- `ignore-scripts`: optionally disable lifecycle scripts in strict mode.
+
+The recommended preset runs:
+
+```bash
+npm config set min-release-age 7 --location=user
+npm config set save-exact true --location=user
+npm config set allow-git none --location=user
+npm config set ignore-scripts false --location=user
+```
+
+Python is advisory in Spice because stock pip does not have a global rolling package-age setting. The Harden page recommends lockfiles, hashes, constraints, or `uv --exclude-newer` when Python package-age cutoffs are needed.
 
 ## Use The CLI
 

@@ -1,4 +1,4 @@
-export type Mode = 'scan' | 'findings' | 'inventory' | 'settings';
+export type Mode = 'scan' | 'findings' | 'inventory' | 'harden' | 'settings';
 
 export type Finding = {
   detectionId: string;
@@ -159,4 +159,36 @@ export type InventoryLocationsResult = {
   locations: InventoryLocation[];
   total: number;
   limit: number;
+};
+
+export type GuardrailSetting = {
+  key: string;
+  value: string;
+  wanted?: string;
+  description: string;
+  status: string;
+};
+
+export type HardenPreset = {
+  id: string;
+  name: string;
+  description: string;
+  settings: GuardrailSetting[];
+};
+
+export type PackageManagerStatus = {
+  available: boolean;
+  version?: string;
+  path?: string;
+  activePreset?: string;
+  settings: GuardrailSetting[];
+  notes: string[];
+  lastAppliedAt?: string;
+  error?: string;
+};
+
+export type HardenStatus = {
+  npm: PackageManagerStatus;
+  python: PackageManagerStatus;
+  presets: HardenPreset[];
 };
