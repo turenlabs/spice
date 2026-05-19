@@ -97,7 +97,7 @@ codesign --force --deep --options runtime --timestamp \
   --sign "$APPLE_CODESIGN_IDENTITY" \
   "$APP_BUNDLE"
 
-codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
+codesign --verify --deep --strict "$APP_BUNDLE"
 
 printf "Creating notarization archive\n"
 ditto -c -k --keepParent "$APP_BUNDLE" "$notary_zip"
@@ -121,7 +121,7 @@ printf "Stapling notarization ticket\n"
 xcrun stapler staple "$APP_BUNDLE"
 xcrun stapler validate "$APP_BUNDLE"
 
-spctl -a -vvv -t install "$APP_BUNDLE"
+spctl --assess --type execute "$APP_BUNDLE"
 
 mkdir -p "$DIST_DIR"
 rm -f "$DIST_DIR/$ARCHIVE_NAME"
