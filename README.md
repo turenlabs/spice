@@ -67,7 +67,7 @@ Use **Deep disk scan** only when you want a broader pass over selected paths. It
 
 ## Harden Package Installs
 
-The **Harden** page helps developers apply reversible npm guardrails:
+The **Harden** page helps developers apply reversible npm guardrails from the desktop app. It reads your current user-level npm config, shows the exact commands it will run, and lets you choose between a daily-use preset, a stricter preset, or npm defaults.
 
 - `min-release-age`: avoid npm versions published too recently.
 - `save-exact`: save exact versions for new installs.
@@ -82,6 +82,8 @@ npm config set save-exact true --location=user
 npm config set allow-git none --location=user
 npm config set ignore-scripts false --location=user
 ```
+
+Use **Strict** if you want lifecycle scripts disabled globally. Use **npm defaults** to back out the settings Spice changes.
 
 ## Use The CLI
 
