@@ -115,6 +115,7 @@ function App() {
   const [clearLog, setClearLog] = useState<string[]>([]);
   const [hardenStatus, setHardenStatus] = useState<HardenStatus | null>(null);
   const [hardenPreset, setHardenPreset] = useState('recommended');
+  const [hardenRefreshing, setHardenRefreshing] = useState(false);
 
   const paths = useMemo(() => pathText.split(/[\n,]/).map((path) => path.trim()).filter(Boolean), [pathText]);
   const hasWails = Boolean(api());
@@ -153,6 +154,11 @@ function App() {
       }
     }).catch(() => undefined);
   }, [hasWails]);
+
+  useEffect(() => {
+    if (!hasWails || mode !== 'harden') return;
+    void refreshHardenStatus({ silent: true });
+  }, [hasWails, mode]);
 
   useEffect(() => {
     if (!hasWails) return;
@@ -395,9 +401,10 @@ function App() {
     setScanProgress((current) => current ? { ...current, status: 'Stopping after current files', running: true } : current);
   }
 
-  async function refreshHardenStatus() {
+  async function refreshHardenStatus(options?: { silent?: boolean }) {
     if (!api()) return;
-    setError('');
+    if (!options?.silent) setError('');
+    setHardenRefreshing(true);
     try {
       const status = await api()!.HardenStatus();
       setHardenStatus(status);
@@ -406,6 +413,8 @@ function App() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setHardenRefreshing(false);
     }
   }
 
@@ -520,6 +529,7 @@ function App() {
             ) : mode === 'harden' ? (
               <HardenPanel
                 applying={busy === 'harden'}
+                refreshing={hardenRefreshing}
                 selectedPreset={hardenPreset}
                 status={hardenStatus}
                 onApply={applyHardenPreset}

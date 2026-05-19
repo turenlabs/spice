@@ -5,6 +5,7 @@ import type { GuardrailSetting, HardenStatus, PackageManagerStatus } from '../ty
 
 export function HardenPanel({
   applying,
+  refreshing,
   selectedPreset,
   status,
   onApply,
@@ -12,6 +13,7 @@ export function HardenPanel({
   onSelectPreset,
 }: {
   applying: boolean;
+  refreshing: boolean;
   selectedPreset: string;
   status: HardenStatus | null;
   onApply: () => void;
@@ -33,8 +35,8 @@ export function HardenPanel({
           </p>
         </div>
         <div className="hardenHeroActions">
-          <Button icon={<RotateCw size={16} />} onClick={onRefresh} variant="secondary">Refresh</Button>
-          <Button disabled={applying || !npm?.available || !selected} icon={applying ? <Spinner /> : <ShieldCheck size={16} />} onClick={onApply} variant="primary">
+          <Button disabled={refreshing} icon={refreshing ? <Spinner /> : <RotateCw size={16} />} onClick={onRefresh} variant="secondary">Refresh</Button>
+          <Button disabled={applying || refreshing || !npm?.available || !selected} icon={applying ? <Spinner /> : <ShieldCheck size={16} />} onClick={onApply} variant="primary">
             Apply preset
           </Button>
         </div>
@@ -49,6 +51,7 @@ export function HardenPanel({
             </div>
             <StatusPill value={npm?.activePreset || 'unknown'} />
           </div>
+          {refreshing && !status && <div className="hardenNotice"><Spinner /> Reading local package manager settings</div>}
 
           <div className="hardenPresetGrid" role="radiogroup" aria-label="npm hardening preset">
             {(status?.presets ?? []).map((preset) => (
