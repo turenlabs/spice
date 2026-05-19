@@ -14,6 +14,18 @@ Spice is a best-effort local detection tool. It can help find known indicators, 
 
 ## Run
 
+Install the CLI with Homebrew:
+
+```bash
+brew tap turenlabs/tap
+brew install turenlabs/tap/spice
+spice version
+```
+
+Download the signed macOS app bundle from the [latest GitHub release](https://github.com/turenlabs/spice/releases/latest).
+
+Run the desktop app from source:
+
 ```bash
 go install github.com/wailsapp/wails/v2/cmd/wails@latest
 cd frontend && npm install && npm run build
