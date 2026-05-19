@@ -189,6 +189,5 @@ export type PackageManagerStatus = {
 
 export type HardenStatus = {
   npm: PackageManagerStatus;
-  python: PackageManagerStatus;
   presets: HardenPreset[];
 };

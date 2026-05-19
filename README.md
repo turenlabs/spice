@@ -83,8 +83,6 @@ npm config set allow-git none --location=user
 npm config set ignore-scripts false --location=user
 ```
 
-Python is advisory in Spice because stock pip does not have a global rolling package-age setting. The Harden page recommends lockfiles, hashes, constraints, or `uv --exclude-newer` when Python package-age cutoffs are needed.
-
 ## Use The CLI
 
 Scan the current project:

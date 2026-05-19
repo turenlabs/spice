@@ -13,7 +13,6 @@ import (
 
 type HardenStatus struct {
 	NPM     PackageManagerStatus `json:"npm"`
-	Python  PackageManagerStatus `json:"python"`
 	Presets []HardenPreset       `json:"presets"`
 }
 
@@ -87,7 +86,6 @@ func currentHardenStatus(appliedAt string) HardenStatus {
 	}
 	return HardenStatus{
 		NPM:     npm,
-		Python:  pythonGuardrailStatus(),
 		Presets: npmHardenPresets(),
 	}
 }
@@ -125,44 +123,6 @@ func npmGuardrailStatus() PackageManagerStatus {
 		})
 	}
 	status.ActivePreset = hardenPresetFromValues(values)
-	return status
-}
-
-func pythonGuardrailStatus() PackageManagerStatus {
-	status := PackageManagerStatus{
-		Settings: []GuardrailSetting{
-			{
-				Key:         "pip package age",
-				Value:       "unsupported",
-				Description: "Stock pip does not provide a global rolling minimum package age setting.",
-				Status:      "info",
-			},
-			{
-				Key:         "pip hashes",
-				Value:       "available per install",
-				Description: "Use pip --require-hashes with locked requirements for stronger repeatability.",
-				Status:      "info",
-			},
-		},
-		Notes: []string{
-			"For Python, prefer lockfiles, hashes, constraints, or uv when you need package-age cutoffs.",
-		},
-	}
-	if pipPath, err := findExecutable("pip3"); err == nil {
-		status.Available = true
-		status.Path = pipPath
-		status.Version = commandOutput(context.Background(), pipPath, "--version")
-	}
-	if uvPath, err := findExecutable("uv"); err == nil {
-		status.Notes = append(status.Notes, "uv is installed and supports --exclude-newer or UV_EXCLUDE_NEWER for fixed-date cutoffs.")
-		status.Settings = append(status.Settings, GuardrailSetting{
-			Key:         "uv exclude-newer",
-			Value:       "available",
-			Description: "uv can limit packages to versions uploaded before a specific date.",
-			Status:      "ok",
-		})
-		_ = uvPath
-	}
 	return status
 }
 

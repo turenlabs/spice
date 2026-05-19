@@ -1,7 +1,6 @@
-import { CheckCircle2, Info, RotateCw, ShieldCheck, Terminal, TriangleAlert } from 'lucide-react';
+import { CheckCircle2, Info, RotateCw, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { Button, Spinner } from './Common';
-import type { ReactNode } from 'react';
-import type { GuardrailSetting, HardenStatus, PackageManagerStatus } from '../types';
+import type { GuardrailSetting, HardenStatus } from '../types';
 
 export function HardenPanel({
   applying,
@@ -31,7 +30,6 @@ export function HardenPanel({
           <h1>Harden installs before the next package lands</h1>
           <p>
             Apply simple npm defaults that slow down brand-new releases, pin new installs, and avoid Git dependency shortcuts.
-            Python is advisory here because stock pip does not have a global rolling package-age setting.
           </p>
         </div>
         <div className="hardenHeroActions">
@@ -88,12 +86,6 @@ export function HardenPanel({
           {npm?.error && <div className="hardenNotice danger"><TriangleAlert size={16} />{npm.error}</div>}
         </section>
 
-        <PackageManagerCard
-          icon={<Terminal size={18} />}
-          status={status?.python ?? null}
-          title="Python guardrails"
-        />
-
         <section className="hardenCard">
           <div className="hardenCardHead">
             <div>
@@ -128,28 +120,6 @@ function SettingsTable({ settings }: { settings: GuardrailSetting[] }) {
         </div>
       ))}
     </div>
-  );
-}
-
-function PackageManagerCard({ icon, status, title }: {
-  icon: ReactNode;
-  status: PackageManagerStatus | null;
-  title: string;
-}) {
-  return (
-    <section className="hardenCard">
-      <div className="hardenCardHead">
-        <div>
-          <h2>{title}</h2>
-          <p>{status?.available ? status.version : 'Advisory checks only'}</p>
-        </div>
-        {icon}
-      </div>
-      <SettingsTable settings={status?.settings ?? []} />
-      <ul className="hardenList">
-        {(status?.notes ?? []).map((note) => <li key={note}>{note}</li>)}
-      </ul>
-    </section>
   );
 }
 
