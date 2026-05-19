@@ -10,7 +10,7 @@ ARCHIVE_NAME="${ARCHIVE_NAME:-${APP_NAME}_${VERSION}_macos_app.zip}"
 require_env() {
   local name="$1"
   if [[ -z "${!name:-}" ]]; then
-    printf "Missing required environment variable: %s\n" "$name" >&2
+    printf "Missing required release credential.\n" >&2
     exit 1
   fi
 }
@@ -39,7 +39,7 @@ elif [[ -n "${APPLE_ID:-}" || -n "${APPLE_ID_PASSWORD:-}" || -n "${APPLE_TEAM_ID
   done
   notary_auth="apple-id"
 else
-  printf "Missing notarization credentials. Set either APPLE_NOTARY_KEY_* secrets or APPLE_ID, APPLE_ID_PASSWORD, and APPLE_TEAM_ID.\n" >&2
+  printf "Missing required notarization credentials.\n" >&2
   exit 1
 fi
 
