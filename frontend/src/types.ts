@@ -66,6 +66,13 @@ export type ScanProgressPayload = Partial<{
   total: number;
 }>;
 
+export type ClearLocalDataProgress = {
+  phase: string;
+  status: string;
+  percent: number;
+  done?: boolean;
+};
+
 export type ScanFindingPayload = {
   scanId?: string;
   seq?: number;

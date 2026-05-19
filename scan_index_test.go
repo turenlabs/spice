@@ -50,6 +50,36 @@ func TestIndexedScanSkipsUnchangedFilesAndReturnsCachedFindings(t *testing.T) {
 	}
 }
 
+func TestScanProgressResetsPercentWhenScanningStarts(t *testing.T) {
+	dir := t.TempDir()
+	manifest := filepath.Join(dir, "package.json")
+	if err := os.WriteFile(manifest, []byte(`{"dependencies":{"@tanstack/react-router":"1.169.5"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	index, err := OpenScanIndex(filepath.Join(dir, "scan-index.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer index.Close()
+
+	var progress []ScanProgress
+	if _, err := newTestScannerWithOptions(index, func(item ScanProgress) {
+		progress = append(progress, item)
+	}).Scan([]string{dir}); err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range progress {
+		if item.Phase == "scanning" {
+			if item.Processed == 0 && item.Percent != 0 {
+				t.Fatalf("expected scanning phase to start at 0 percent, got %#v", item)
+			}
+			return
+		}
+	}
+	t.Fatalf("expected scanning progress event, got %#v", progress)
+}
+
 func newTestScannerWithOptions(index *FileIndex, progress ScanProgressFunc) *Scanner {
 	scanner := NewScannerWithOptions(index, progress)
 	scanner.UseRemoteDetectionBundle(&RemoteDetectionBundle{Packs: []*RemoteDetectionPack{testRemotePack()}})
@@ -488,5 +518,23 @@ func TestScanRunHistoryPersistsLastScan(t *testing.T) {
 	}
 	if got.FinishedAt != want.FinishedAt || got.Status != "completed" || len(got.Findings) != 1 || got.Findings[0].Evidence != want.Findings[0].Evidence {
 		t.Fatalf("unexpected last scan: %#v", got)
+	}
+
+	canceled := want
+	canceled.FinishedAt = "2026-05-12T10:00:03Z"
+	canceled.Status = "canceled"
+	canceled.Findings[0].Evidence = "partial evidence"
+	if err := index.SaveScanRun(canceled); err != nil {
+		t.Fatal(err)
+	}
+	got, ok, err = index.LastScanRun()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("expected last scan")
+	}
+	if got.FinishedAt != canceled.FinishedAt || got.Status != "canceled" || len(got.Findings) != 1 || got.Findings[0].Evidence != "partial evidence" {
+		t.Fatalf("expected canceled scan to be persisted, got %#v", got)
 	}
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { FindingsTable } from './components/FindingsTable';
 import { InventoryPanel } from './components/InventoryPanel';
@@ -8,6 +9,7 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { Sidebar } from './components/Sidebar';
 import type {
   AppSettings,
+  ClearLocalDataProgress,
   DetectionStatus,
   FilePreview,
   Finding,
@@ -24,12 +26,14 @@ import type {
 } from './types';
 import {
   appendUniqueFinding,
+  clearFindingActions,
   devSeverityCounts,
   elapsed,
   findingKey,
   formatDateTime,
   loadFindingActions,
   normalizeScanProgress,
+  saveFindingActions,
 } from './utils';
 import './style.css';
 
@@ -93,7 +97,7 @@ function App() {
   const [scanCompletedThisSession, setScanCompletedThisSession] = useState(false);
   const [liveFindings, setLiveFindings] = useState<Finding[]>([]);
   const [scanProgress, setScanProgress] = useState<ScanProgress | null>(null);
-  const [busy, setBusy] = useState<'scan' | 'detections' | null>(null);
+  const [busy, setBusy] = useState<'scan' | 'detections' | 'clear' | null>(null);
   const [error, setError] = useState('');
   const [findingActions, setFindingActions] = useState<Record<string, FindingAction>>(() => loadFindingActions());
   const [preview, setPreview] = useState<FilePreview | null>(null);
@@ -103,10 +107,18 @@ function App() {
   const [inventory, setInventory] = useState<InventoryResult>(emptyInventory);
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
+  const [clearProgress, setClearProgress] = useState<ClearLocalDataProgress | null>(null);
+  const [clearLog, setClearLog] = useState<string[]>([]);
 
   const paths = useMemo(() => pathText.split(/[\n,]/).map((path) => path.trim()).filter(Boolean), [pathText]);
   const hasWails = Boolean(api());
   const findings = scanResult?.findings ?? liveFindings;
+  const loadedFindingKeys = useMemo(() => new Set(findings.map(findingKey)), [findings]);
+  const loadedFindingActions = useMemo(() => (
+    Object.fromEntries(
+      Object.entries(findingActions).filter(([key]) => loadedFindingKeys.has(key)),
+    ) as Record<string, FindingAction>
+  ), [findingActions, loadedFindingKeys]);
   const openFindings = findings.filter((finding) => {
     const action = findingActions[findingKey(finding)];
     return action !== 'ignored' && action !== 'deleted';
@@ -136,7 +148,7 @@ function App() {
   }, [hasWails, inventoryRequest]);
 
   useEffect(() => {
-    localStorage.setItem('spice:finding-actions', JSON.stringify(findingActions));
+    saveFindingActions(findingActions);
   }, [findingActions]);
 
   useEffect(() => {
@@ -155,6 +167,25 @@ function App() {
     if (!hasWails) return;
     const off = window.runtime?.EventsOn?.('detections:status', (payload) => {
       setDetectionStatus(payload as DetectionStatus);
+    });
+    return () => {
+      if (off) off();
+    };
+  }, [hasWails]);
+
+  useEffect(() => {
+    if (!hasWails) return;
+    const off = window.runtime?.EventsOn?.('localdata:progress', (payload) => {
+      const next = payload as Partial<ClearLocalDataProgress>;
+      setClearProgress({
+        phase: typeof next.phase === 'string' ? next.phase : 'clearing',
+        status: typeof next.status === 'string' ? next.status : 'Clearing local data',
+        percent: typeof next.percent === 'number' && Number.isFinite(next.percent) ? Math.max(0, Math.min(100, next.percent)) : 0,
+        done: next.done === true,
+      });
+      if (typeof next.status === 'string' && next.status.trim()) {
+        setClearLog((current) => [...current.slice(-7), next.status!.trim()]);
+      }
     });
     return () => {
       if (off) off();
@@ -271,23 +302,47 @@ function App() {
 
   async function clearLocalData() {
     if (!api()) return;
-    const confirmed = window.confirm('Clear local scan history, cached findings, and package inventory? Detection packs and Settings excludes will be kept.');
-    if (!confirmed) return;
-    setError('');
+    flushSync(() => {
+      setBusy('clear');
+      setError('');
+      setClearProgress({ phase: 'starting', status: 'Starting local data clear', percent: 0 });
+      setClearLog(['Starting local data clear']);
+    });
     try {
+      await nextPaint();
       await api()!.ClearLocalData();
       setScanResult(null);
       setLiveFindings([]);
       setScanCompletedThisSession(false);
       setScanProgress(null);
+      clearFindingActions();
       setFindingActions({});
       setInventory(emptyInventory);
       setInventoryRequest(defaultInventoryRequest);
       setPreview(null);
       setPreviewFinding(null);
+      setClearProgress((current) => ({
+        phase: 'done',
+        status: current?.status === 'Local data cleared' ? current.status : 'Local data cleared',
+        percent: 100,
+        done: true,
+      }));
+      setClearLog((current) => [...current.slice(-7), 'Local data cleared']);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[spice] clear local data failed', err);
+      setError(message);
+      setClearProgress({ phase: 'failed', status: `Clear failed: ${message}`, percent: 100, done: true });
+      setClearLog((current) => [...current.slice(-7), `Error: ${message}`]);
+    } finally {
+      setBusy(null);
     }
+  }
+
+  function nextPaint() {
+    return new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
   }
 
   async function loadInventory(request: InventoryRequest) {
@@ -396,7 +451,7 @@ function App() {
             {mode === 'settings' ? (
               <SettingsPanel
                 detectionStatus={detectionStatus}
-                findingActions={findingActions}
+                findingActions={loadedFindingActions}
                 ignoredFindings={ignoredFindings}
                 settings={settings}
                 onAddExcludeDirectory={pickExcludeDirectory}
@@ -405,6 +460,9 @@ function App() {
                 onRestoreFinding={restoreFinding}
                 onSaveSettings={saveSettings}
                 refreshBusy={busy === 'detections'}
+                clearBusy={busy === 'clear'}
+                clearProgress={clearProgress}
+                clearLog={clearLog}
               />
             ) : mode === 'inventory' ? (
               <InventoryPanel

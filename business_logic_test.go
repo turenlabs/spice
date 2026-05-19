@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -413,8 +415,11 @@ func TestCanceledAppScanDoesNotReplaceLastCompletedScanHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.FinishedAt != previous.FinishedAt || got.Status != "completed" || len(got.Findings) != 1 || got.Findings[0].Evidence != previous.Findings[0].Evidence {
-		t.Fatalf("expected last completed scan history to remain unchanged, got %#v", got)
+	if got.Status != "canceled" {
+		t.Fatalf("expected canceled scan history to be surfaced, got %#v", got)
+	}
+	if got.FinishedAt == previous.FinishedAt {
+		t.Fatalf("expected canceled scan to replace previous last scan, got %#v", got)
 	}
 }
 
@@ -497,6 +502,12 @@ func TestClearLocalDataPreservesSettingsAndClearsScanArtifacts(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := index.db.Exec(`CREATE TABLE temp_aff(pkg TEXT, version TEXT, ecosystem TEXT)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := index.db.Exec(`INSERT INTO temp_aff(pkg, version, ecosystem) VALUES ('left-pad', '1.3.0', 'npm')`); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := index.ClearLocalData(); err != nil {
 		t.Fatal(err)
@@ -506,12 +517,34 @@ func TestClearLocalDataPreservesSettingsAndClearsScanArtifacts(t *testing.T) {
 			t.Fatalf("expected %s to be cleared, got %d rows", table, got)
 		}
 	}
+	if got := countRows(t, index, "package_inventory_fts"); got != 0 {
+		t.Fatalf("expected package_inventory_fts to be rebuilt empty, got %d rows", got)
+	}
+	if err := index.ReplacePackagesForSource(filepath.Join(dir, "after-clear", "package.json"), []PackageRef{{
+		Ecosystem:  "npm",
+		Name:       "react",
+		Version:    "19.0.0",
+		SourceKind: "dependencies",
+	}}); err != nil {
+		t.Fatalf("expected inventory triggers to work after clear, got %v", err)
+	}
+	if got := countRows(t, index, "package_inventory"); got != 1 {
+		t.Fatalf("expected package inventory insert after clear to work, got %d rows", got)
+	}
+	if got := countRows(t, index, "package_inventory_fts"); got != 1 {
+		t.Fatalf("expected package inventory fts insert after clear to work, got %d rows", got)
+	}
 	settings, err := index.LoadSettings()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(settings.ExcludedDirs) != 1 || settings.ExcludedDirs[0] != excluded {
 		t.Fatalf("expected settings to survive clear-local-data, got %#v", settings)
+	}
+	var tempAffName string
+	err = index.db.QueryRow(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'temp_aff'`).Scan(&tempAffName)
+	if !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("expected temp_aff scratch table to be dropped, got name=%q err=%v", tempAffName, err)
 	}
 }
 
@@ -678,6 +711,8 @@ func countRows(t *testing.T, index *ScanIndex, table string) int {
 		query = `SELECT COUNT(*) FROM file_index`
 	case "package_inventory":
 		query = `SELECT COUNT(*) FROM package_inventory`
+	case "package_inventory_fts":
+		query = `SELECT COUNT(*) FROM package_inventory_fts`
 	case "scan_runs":
 		query = `SELECT COUNT(*) FROM scan_runs`
 	default:

@@ -38,10 +38,11 @@ export function ScanStrip({
   const running = Boolean(progress?.running);
   const done = !running && scanned;
   const phase = running ? phaseFromProgress(progress) : done ? 'done' : 'ready';
+  const stopped = done && progress ? /stopped|canceled|cancelled/i.test(progress.status) : false;
   const showPercent = phase === 'scanning' || phase === 'done';
   const displayPercent = running && progress && showPercent ? Math.min(99, Math.round(progress.percent)) : done ? 100 : 0;
   const processedLabel = progress?.total ? `${progress.processed.toLocaleString()} / ${progress.total.toLocaleString()}` : progress ? progress.processed.toLocaleString() : 'not started';
-  const phaseTitle = phase === 'indexing' ? 'Indexing file tree' : phase === 'scanning' ? 'Checking candidates' : phase === 'done' ? 'Scan complete' : 'Ready to scan';
+  const phaseTitle = phase === 'indexing' ? 'Indexing file tree' : phase === 'scanning' ? 'Checking candidates' : stopped ? 'Scan stopped' : phase === 'done' ? 'Scan complete' : 'Ready to scan';
   const selectedProfile = scanProfiles.find((item) => item.id === scanProfile) ?? scanProfiles[0];
 
   return (
@@ -146,7 +147,7 @@ export function ScanStrip({
           <CheckCircle2 size={26} />
           <div>
             <strong>{findingsCount === 0 ? 'No open matches' : `${findingsCount} open ${findingsCount === 1 ? 'match' : 'matches'}`}</strong>
-            <span>{findingsCount === 0 ? 'Nothing matched the loaded detection packs in the selected paths.' : 'Review the matched packages, files, and install behavior as triage evidence.'}</span>
+            <span>{stopped ? 'Stopped early. Results shown are from files checked before the stop completed.' : findingsCount === 0 ? 'Nothing matched the loaded detection packs in the selected paths.' : 'Review the matched packages, files, and install behavior as triage evidence.'}</span>
           </div>
           <button className="btn btn-primary" type="button" onClick={onCheckResults}>
             Check results

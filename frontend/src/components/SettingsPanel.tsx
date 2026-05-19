@@ -1,7 +1,7 @@
-import { CheckCircle2, DatabaseZap, FolderPlus, RefreshCw, Trash2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, DatabaseZap, FolderPlus, RefreshCw, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Spinner } from './Common';
-import type { AppSettings, DetectionStatus, Finding, FindingAction } from '../types';
+import type { AppSettings, ClearLocalDataProgress, DetectionStatus, Finding, FindingAction } from '../types';
 import { countActions, defaultRemoteLabel, devKind, devReason, formatOptionalDate } from '../utils';
 
 export function SettingsPanel({
@@ -14,6 +14,9 @@ export function SettingsPanel({
   onRestoreFinding,
   onSaveSettings,
   refreshBusy,
+  clearBusy,
+  clearProgress,
+  clearLog,
   settings,
 }: {
   detectionStatus: DetectionStatus | null;
@@ -21,14 +24,25 @@ export function SettingsPanel({
   ignoredFindings: Finding[];
   settings: AppSettings;
   onAddExcludeDirectory: () => void;
-  onClearLocalData: () => void;
+  onClearLocalData: () => Promise<void>;
   onRefreshDetections: () => void;
   onRestoreFinding: (finding: Finding) => void;
   onSaveSettings: (settings: AppSettings) => void;
   refreshBusy: boolean;
+  clearBusy: boolean;
+  clearProgress: ClearLocalDataProgress | null;
+  clearLog: string[];
 }) {
   const actionCounts = countActions(findingActions);
   const excludedDirs = settings.excludedDirs ?? [];
+  const [clearConfirming, setClearConfirming] = useState(false);
+  const clearFailed = clearProgress?.phase === 'failed';
+
+  async function confirmClear() {
+    setClearConfirming(false);
+    await onClearLocalData();
+  }
+
   return (
     <div className="settingsGrid">
       <section className="card settingsCard">
@@ -57,7 +71,7 @@ export function SettingsPanel({
         <div className="panelHeader">
           <div>
             <h2>Triage workflow</h2>
-            <p>Your View, Ignore, and Delete choices for matched evidence are kept locally on this workstation between app reloads.</p>
+            <p>Your View, Ignore, and Delete choices for the loaded scan are kept locally on this workstation between app reloads.</p>
           </div>
         </div>
         <div className="settingsRows compact">
@@ -71,12 +85,52 @@ export function SettingsPanel({
         <div className="panelHeader">
           <div>
             <h2>Local data</h2>
-            <p>Clear scan history, cached findings, and package inventory. Detection packs and settings are kept.</p>
+            <p>Clear scan history, cached findings, package inventory, and triage choices. Detection packs and settings are kept.</p>
           </div>
-          <Button onClick={onClearLocalData} icon={<DatabaseZap size={16} />}>
-            Clear local data
+          <Button onClick={() => setClearConfirming(true)} disabled={clearBusy || clearConfirming} icon={clearBusy ? <Spinner /> : <DatabaseZap size={16} />}>
+            {clearBusy ? 'Clearing data' : clearConfirming ? 'Confirm clear' : 'Clear local data'}
           </Button>
         </div>
+        {(clearConfirming || clearBusy || clearProgress) && (
+          <div className={`clearProgress ${clearFailed ? 'failed' : ''}`}>
+            {clearConfirming && !clearBusy && (
+              <div className="clearConfirm">
+                <AlertTriangle size={18} />
+                <div>
+                  <strong>Clear local cache data?</strong>
+                  <span>This removes scan history, findings, file index rows, inventory rows, and local triage choices. Detection packs and settings stay.</span>
+                </div>
+                <div className="clearConfirmActions">
+                  <button type="button" className="btn btn-ghost" onClick={() => setClearConfirming(false)}>
+                    <X size={15} />
+                    <span>Cancel</span>
+                  </button>
+                  <button type="button" className="btn btn-primary" onClick={() => void confirmClear()}>
+                    <DatabaseZap size={15} />
+                    <span>Clear now</span>
+                  </button>
+                </div>
+              </div>
+            )}
+            <div className="clearProgressTop">
+              <span>{clearConfirming && !clearBusy ? 'Waiting for confirmation' : clearProgress?.status ?? 'Waiting to clear local data'}</span>
+              <strong>{Math.round(clearProgress?.percent ?? 0)}%</strong>
+            </div>
+            <div className="clearProgressTrack" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(clearProgress?.percent ?? 0)}>
+              <div style={{ width: `${Math.round(clearProgress?.percent ?? 0)}%` }} />
+            </div>
+            <span className="clearProgressHint">
+              {clearBusy ? 'Large inventories can take a moment while SQLite drops and compacts local cache tables.' : clearProgress?.done ? 'The next scan will rebuild the file index and inventory from scratch.' : ''}
+            </span>
+            {clearLog.length > 0 && (
+              <div className="clearLog" aria-label="Local data clear log">
+                {clearLog.map((line, index) => (
+                  <span key={`${line}-${index}`}>{line}</span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       <section className="card settingsCard settingsWide">

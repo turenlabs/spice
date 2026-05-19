@@ -609,6 +609,110 @@ textarea:focus {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.clearProgress {
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.clearProgress.failed {
+  background: rgba(212, 69, 36, 0.08);
+}
+
+.clearConfirm {
+  align-items: flex-start;
+  background: rgba(212, 165, 72, 0.10);
+  border: 1px solid rgba(212, 165, 72, 0.32);
+  border-radius: 10px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 12px;
+}
+
+.clearConfirm svg {
+  color: #e8c67f;
+  margin-top: 1px;
+}
+
+.clearConfirm strong {
+  color: var(--text);
+  display: block;
+  font-size: 13px;
+}
+
+.clearConfirm span {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  line-height: 1.45;
+  margin-top: 3px;
+}
+
+.clearConfirmActions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.clearProgressTop {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.clearProgressTop span {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.clearProgressTop strong,
+.clearProgressHint {
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.clearProgressTrack {
+  background: rgba(4, 8, 14, 0.64);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.clearProgressTrack div {
+  background: linear-gradient(90deg, #5fcbff, #8b5cf6);
+  height: 100%;
+  transition: width 160ms ease;
+}
+
+.clearProgress.failed .clearProgressTrack div {
+  background: #d44524;
+}
+
+.clearLog {
+  background: rgba(4, 8, 14, 0.52);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: grid;
+  gap: 4px;
+  max-height: 130px;
+  overflow: auto;
+  padding: 10px;
+}
+
+.clearLog span {
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
 .excludeBox {
   border-top: 1px solid var(--border);
   display: grid;

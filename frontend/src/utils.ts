@@ -1,5 +1,7 @@
 import type { Finding, FindingAction, ScanProgress, ScanProgressPayload } from './types';
 
+export const findingActionsStorageKey = 'spice:finding-actions';
+
 export function normalizeScanProgress(payload: unknown, current: ScanProgress | null): ScanProgress {
   const progress = (payload && typeof payload === 'object' ? payload : {}) as ScanProgressPayload;
   const seq = firstNumber(progress.seq, 0) ?? 0;
@@ -20,10 +22,11 @@ export function normalizeScanProgress(payload: unknown, current: ScanProgress | 
   const rawPercent = firstNumber(progress.percent, progress.percentage);
   const calculatedPercent = total && total > 0 ? (processed / total) * 100 : undefined;
   const phase = firstText(progress.phase, current?.phase, 'scanning');
+  const phaseChanged = Boolean(current && phase !== current.phase);
   const status = firstText(progress.status, progress.message, current?.status, 'Scanning selected paths');
   const done = progress.done === true || /completed|complete|finished|done/i.test(status);
-  const nextPercent = done ? 100 : normalizePercent(rawPercent ?? calculatedPercent ?? current?.percent ?? 0);
-  const percent = current && !done ? Math.max(current.percent, nextPercent) : nextPercent;
+  const nextPercent = done ? 100 : normalizePercent(rawPercent ?? calculatedPercent ?? (phaseChanged ? 0 : current?.percent) ?? 0);
+  const percent = current && !done && !phaseChanged ? Math.max(current.percent, nextPercent) : nextPercent;
   const currentFile = firstText(
     progress.currentFile,
     progress.currentPath,
@@ -58,11 +61,19 @@ export function appendUniqueFinding(findings: Finding[], finding: Finding) {
 
 export function loadFindingActions(): Record<string, FindingAction> {
   try {
-    const parsed = JSON.parse(localStorage.getItem('spice:finding-actions') || '{}') as Record<string, FindingAction>;
+    const parsed = JSON.parse(localStorage.getItem(findingActionsStorageKey) || '{}') as Record<string, FindingAction>;
     return parsed && typeof parsed === 'object' ? parsed : {};
   } catch {
     return {};
   }
+}
+
+export function saveFindingActions(actions: Record<string, FindingAction>) {
+  localStorage.setItem(findingActionsStorageKey, JSON.stringify(actions));
+}
+
+export function clearFindingActions() {
+  localStorage.removeItem(findingActionsStorageKey);
 }
 
 export function findingKey(finding: Finding) {
@@ -157,6 +168,7 @@ export function defaultRemoteLabel() {
 }
 
 export function progressLabel(phase: string, status: string) {
+  if (/stopped|canceled|cancelled/i.test(status)) return 'Scan stopped early';
   if (phase === 'indexing' || phase === 'enumerating') return 'Indexing file tree';
   if (phase === 'scanning') return 'Checking files against loaded packs';
   if (phase === 'done') return 'Scan completed';

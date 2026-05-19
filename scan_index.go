@@ -27,6 +27,13 @@ type ScanIndex struct {
 
 type FileIndex = ScanIndex
 
+type ClearLocalDataProgress struct {
+	Phase   string `json:"phase"`
+	Status  string `json:"status"`
+	Percent int    `json:"percent"`
+	Done    bool   `json:"done"`
+}
+
 type CachedFileScan struct {
 	Findings     []Finding
 	SHA256       string
@@ -46,6 +53,34 @@ type indexedFile struct {
 
 const scanEngineVersion = "2026-05-13-remote-rules-v2"
 const inventoryFTSVersion = "2026-05-16-inventory-fts-v1"
+
+const createPackageInventoryFTS = `CREATE VIRTUAL TABLE IF NOT EXISTS package_inventory_fts USING fts5(
+			ecosystem,
+			name,
+			version,
+			source_kind,
+			source_path,
+			source_sha256,
+			content='package_inventory',
+			content_rowid='id'
+		)`
+
+var packageInventoryTriggers = []string{
+	`CREATE TRIGGER IF NOT EXISTS package_inventory_ai AFTER INSERT ON package_inventory BEGIN
+			INSERT INTO package_inventory_fts(rowid, ecosystem, name, version, source_kind, source_path, source_sha256)
+			VALUES (new.id, new.ecosystem, new.name, new.version, new.source_kind, new.source_path, new.source_sha256);
+		END`,
+	`CREATE TRIGGER IF NOT EXISTS package_inventory_ad AFTER DELETE ON package_inventory BEGIN
+			INSERT INTO package_inventory_fts(package_inventory_fts, rowid, ecosystem, name, version, source_kind, source_path, source_sha256)
+			VALUES ('delete', old.id, old.ecosystem, old.name, old.version, old.source_kind, old.source_path, old.source_sha256);
+		END`,
+	`CREATE TRIGGER IF NOT EXISTS package_inventory_au AFTER UPDATE ON package_inventory BEGIN
+			INSERT INTO package_inventory_fts(package_inventory_fts, rowid, ecosystem, name, version, source_kind, source_path, source_sha256)
+			VALUES ('delete', old.id, old.ecosystem, old.name, old.version, old.source_kind, old.source_path, old.source_sha256);
+			INSERT INTO package_inventory_fts(rowid, ecosystem, name, version, source_kind, source_path, source_sha256)
+			VALUES (new.id, new.ecosystem, new.name, new.version, new.source_kind, new.source_path, new.source_sha256);
+		END`,
+}
 
 func OpenScanIndex(dbPath string) (*ScanIndex, error) {
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
@@ -140,43 +175,23 @@ func (idx *ScanIndex) migrate(ctx context.Context) error {
 		`CREATE INDEX IF NOT EXISTS idx_package_inventory_source_hash ON package_inventory(source_sha256)`,
 		`CREATE INDEX IF NOT EXISTS idx_package_inventory_dedup ON package_inventory(ecosystem, name, version, source_kind, source_sha256, source_path)`,
 		`CREATE INDEX IF NOT EXISTS idx_package_inventory_filter ON package_inventory(ecosystem, source_kind, name, version)`,
-		`CREATE VIRTUAL TABLE IF NOT EXISTS package_inventory_fts USING fts5(
-			ecosystem,
-			name,
-			version,
-			source_kind,
-			source_path,
-			source_sha256,
-			content='package_inventory',
-			content_rowid='id'
-		)`,
-		`CREATE TRIGGER IF NOT EXISTS package_inventory_ai AFTER INSERT ON package_inventory BEGIN
-			INSERT INTO package_inventory_fts(rowid, ecosystem, name, version, source_kind, source_path, source_sha256)
-			VALUES (new.id, new.ecosystem, new.name, new.version, new.source_kind, new.source_path, new.source_sha256);
-		END`,
-		`CREATE TRIGGER IF NOT EXISTS package_inventory_ad AFTER DELETE ON package_inventory BEGIN
-			INSERT INTO package_inventory_fts(package_inventory_fts, rowid, ecosystem, name, version, source_kind, source_path, source_sha256)
-			VALUES ('delete', old.id, old.ecosystem, old.name, old.version, old.source_kind, old.source_path, old.source_sha256);
-		END`,
-		`CREATE TRIGGER IF NOT EXISTS package_inventory_au AFTER UPDATE ON package_inventory BEGIN
-			INSERT INTO package_inventory_fts(package_inventory_fts, rowid, ecosystem, name, version, source_kind, source_path, source_sha256)
-			VALUES ('delete', old.id, old.ecosystem, old.name, old.version, old.source_kind, old.source_path, old.source_sha256);
-			INSERT INTO package_inventory_fts(rowid, ecosystem, name, version, source_kind, source_path, source_sha256)
-			VALUES (new.id, new.ecosystem, new.name, new.version, new.source_kind, new.source_path, new.source_sha256);
-		END`,
+		createPackageInventoryFTS,
 		`CREATE TABLE IF NOT EXISTS scan_runs (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			started_at TEXT NOT NULL,
 			finished_at TEXT NOT NULL,
 			roots_json TEXT NOT NULL,
-			findings_json TEXT NOT NULL
+			findings_json TEXT NOT NULL,
+			status TEXT NOT NULL DEFAULT 'completed'
 		)`,
+		`ALTER TABLE scan_runs ADD COLUMN status TEXT NOT NULL DEFAULT 'completed'`,
 		`CREATE TABLE IF NOT EXISTS app_settings (
 			key TEXT PRIMARY KEY,
 			value_json TEXT NOT NULL,
 			updated_at TEXT NOT NULL
 		)`,
 	}
+	stmts = append(stmts, packageInventoryTriggers...)
 	for _, stmt := range stmts {
 		if _, err := idx.db.ExecContext(ctx, stmt); err != nil {
 			if strings.Contains(err.Error(), "duplicate column name") {
@@ -266,16 +281,30 @@ func (idx *ScanIndex) SaveScanRun(result ScanResult) error {
 	if err != nil {
 		return err
 	}
-	_, err = idx.db.ExecContext(context.Background(), `INSERT INTO scan_runs (started_at, finished_at, roots_json, findings_json)
-		VALUES (?, ?, ?, ?)`, result.StartedAt, result.FinishedAt, string(rootsJSON), string(findingsJSON))
+	status := strings.TrimSpace(result.Status)
+	if status == "" {
+		status = "completed"
+	}
+	_, err = idx.db.ExecContext(context.Background(), `INSERT INTO scan_runs (started_at, finished_at, roots_json, findings_json, status)
+		VALUES (?, ?, ?, ?, ?)`, result.StartedAt, result.FinishedAt, string(rootsJSON), string(findingsJSON), status)
 	return err
 }
 
 func (idx *ScanIndex) ClearLocalData() error {
+	return idx.ClearLocalDataWithProgress(nil)
+}
+
+func (idx *ScanIndex) ClearLocalDataWithProgress(progress func(ClearLocalDataProgress)) error {
 	if idx == nil || idx.db == nil {
 		return nil
 	}
+	emit := func(phase, status string, percent int, done bool) {
+		if progress != nil {
+			progress(ClearLocalDataProgress{Phase: phase, Status: status, Percent: percent, Done: done})
+		}
+	}
 	ctx := context.Background()
+	emit("preparing", "Preparing local database", 5, false)
 	tx, err := idx.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -285,21 +314,47 @@ func (idx *ScanIndex) ClearLocalData() error {
 			_ = tx.Rollback()
 		}
 	}()
+	emit("dropping", "Removing scan cache tables", 20, false)
 	for _, stmt := range []string{
-		`DELETE FROM file_findings`,
-		`DELETE FROM file_index`,
-		`DELETE FROM package_inventory`,
-		`DELETE FROM scan_runs`,
+		`DROP TRIGGER IF EXISTS package_inventory_ai`,
+		`DROP TRIGGER IF EXISTS package_inventory_ad`,
+		`DROP TRIGGER IF EXISTS package_inventory_au`,
 	} {
 		if _, err = tx.ExecContext(ctx, stmt); err != nil {
 			return err
 		}
 	}
+	emit("dropping", "Dropping file index and inventory", 45, false)
+	for _, stmt := range []string{
+		`DROP TABLE IF EXISTS package_inventory_fts`,
+		`DROP TABLE IF EXISTS file_findings`,
+		`DROP TABLE IF EXISTS file_index`,
+		`DROP TABLE IF EXISTS package_inventory`,
+		`DROP TABLE IF EXISTS scan_runs`,
+		`DROP TABLE IF EXISTS temp_aff`,
+	} {
+		if _, err = tx.ExecContext(ctx, stmt); err != nil {
+			return err
+		}
+	}
+	emit("schema", "Rebuilding empty local tables", 65, false)
+	if _, err = tx.ExecContext(ctx, `INSERT INTO app_settings (key, value_json, updated_at)
+		VALUES (?, ?, ?)
+		ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at`,
+		"inventory_fts_version", inventoryFTSVersion, time.Now().Format(time.RFC3339Nano)); err != nil {
+		return err
+	}
 	if err = tx.Commit(); err != nil {
 		return err
 	}
+	emit("schema", "Recreating indexes", 75, false)
+	if err = idx.migrate(ctx); err != nil {
+		return err
+	}
+	emit("compact", "Compacting local database", 90, false)
 	_, _ = idx.db.ExecContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`)
 	_, _ = idx.db.ExecContext(ctx, `VACUUM`)
+	emit("done", "Local data cleared", 100, true)
 	return nil
 }
 
@@ -310,8 +365,8 @@ func (idx *ScanIndex) LastScanRun() (ScanResult, bool, error) {
 	var result ScanResult
 	var rootsJSON string
 	var findingsJSON string
-	err := idx.db.QueryRowContext(context.Background(), `SELECT started_at, finished_at, roots_json, findings_json
-		FROM scan_runs ORDER BY id DESC LIMIT 1`).Scan(&result.StartedAt, &result.FinishedAt, &rootsJSON, &findingsJSON)
+	err := idx.db.QueryRowContext(context.Background(), `SELECT started_at, finished_at, roots_json, findings_json, status
+		FROM scan_runs ORDER BY id DESC LIMIT 1`).Scan(&result.StartedAt, &result.FinishedAt, &rootsJSON, &findingsJSON, &result.Status)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ScanResult{}, false, nil
 	}
@@ -325,7 +380,9 @@ func (idx *ScanIndex) LastScanRun() (ScanResult, bool, error) {
 		return ScanResult{}, false, err
 	}
 	result.Indexed = true
-	result.Status = "completed"
+	if result.Status == "" {
+		result.Status = "completed"
+	}
 	return result, true, nil
 }
 

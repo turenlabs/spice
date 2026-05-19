@@ -271,9 +271,7 @@ func (a *App) Scan(req ScanRequest) (ScanResult, error) {
 		Indexed:    true,
 		Status:     status,
 	}
-	if status == "completed" {
-		_ = index.SaveScanRun(result)
-	}
+	_ = index.SaveScanRun(result)
 	return result, nil
 }
 
@@ -322,14 +320,48 @@ func (a *App) SaveSettings(settings AppSettings) (AppSettings, error) {
 }
 
 func (a *App) ClearLocalData() error {
+	started := time.Now()
+	if a.ctx != nil {
+		runtime.LogInfo(a.ctx, "clear local data requested")
+	}
+	if a.ctx != nil {
+		runtime.EventsEmit(a.ctx, "localdata:progress", ClearLocalDataProgress{
+			Phase:   "waiting",
+			Status:  "Waiting for active scan work to finish",
+			Percent: 1,
+		})
+	}
 	a.scanMu.Lock()
 	defer a.scanMu.Unlock()
 	index, err := OpenFileIndex()
 	if err != nil {
+		if a.ctx != nil {
+			runtime.LogErrorf(a.ctx, "clear local data failed opening index: %v", err)
+		}
 		return err
 	}
 	defer index.Close()
-	return index.ClearLocalData()
+	err = index.ClearLocalDataWithProgress(func(progress ClearLocalDataProgress) {
+		if a.ctx != nil {
+			runtime.EventsEmit(a.ctx, "localdata:progress", progress)
+		}
+	})
+	if err != nil {
+		if a.ctx != nil {
+			runtime.LogErrorf(a.ctx, "clear local data failed after %s: %v", time.Since(started).Round(time.Millisecond), err)
+			runtime.EventsEmit(a.ctx, "localdata:progress", ClearLocalDataProgress{
+				Phase:   "failed",
+				Status:  fmt.Sprintf("Clear failed: %v", err),
+				Percent: 100,
+				Done:    true,
+			})
+		}
+		return err
+	}
+	if a.ctx != nil {
+		runtime.LogInfof(a.ctx, "clear local data completed in %s", time.Since(started).Round(time.Millisecond))
+	}
+	return nil
 }
 
 func (a *App) Inventory(req InventoryRequest) (InventoryResult, error) {

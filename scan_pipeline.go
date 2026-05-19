@@ -76,7 +76,7 @@ func (p *scanPipeline) Run(roots []string) ([]Finding, error) {
 		Status:   "Scanning indexed files",
 		Phase:    "scanning",
 		Total:    len(indexed.candidates),
-		Percent:  indexingPercent(len(roots), len(roots)),
+		Percent:  0,
 		Findings: len(findings),
 	}
 	p.scanner.emitProgress(progress)
