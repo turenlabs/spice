@@ -76,7 +76,7 @@ Required repository secrets:
 
 - `APPLE_CERTIFICATE_P12_BASE64`: base64-encoded Developer ID Application `.p12`
 - `APPLE_CERTIFICATE_PASSWORD`: password used when exporting the `.p12`
-- `APPLE_CODESIGN_IDENTITY`: exact signing identity, for example `Developer ID Application: Turen Labs, Inc. (5Q9UJQ9MPK)`
+- `APPLE_CODESIGN_IDENTITY`: exact Developer ID Application signing identity
 
 For notarization, use either the App Store Connect API key secrets:
 
@@ -88,7 +88,7 @@ Or the Apple ID/app-specific-password secrets used by the Turen Agent release fl
 
 - `APPLE_ID`: Apple ID with access to the Turen Labs developer team
 - `APPLE_ID_PASSWORD`: app-specific password for that Apple ID
-- `APPLE_TEAM_ID`: Apple Developer Team ID, for example `5Q9UJQ9MPK`
+- `APPLE_TEAM_ID`: Apple Developer Team ID
 
 The release workflow creates a temporary keychain, imports the `.p12`, signs the Wails app with hardened runtime, submits the app zip to Apple notarization, staples the ticket, verifies with `codesign`, `stapler`, and `spctl`, then writes the final macOS app zip under `dist/`.
 
@@ -98,7 +98,7 @@ Local helper commands for secret material:
 openssl pkcs12 -export \
   -inkey ~/.spice-signing/TurenLabsInc_DeveloperID_G2.key \
   -in ~/.spice-signing/developerID_application.pem \
-  -name "Developer ID Application: Turen Labs, Inc. (5Q9UJQ9MPK)" \
+  -name "$APPLE_CODESIGN_IDENTITY" \
   -out ~/.spice-signing/TurenLabsInc_DeveloperID_G2.p12
 
 base64 -i ~/.spice-signing/TurenLabsInc_DeveloperID_G2.p12 | tr -d '\n'

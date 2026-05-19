@@ -92,13 +92,12 @@ security set-key-partition-list \
   -k "$keychain_password" \
   "$keychain"
 
-printf "Signing %s with %s\n" "$APP_BUNDLE" "$APPLE_CODESIGN_IDENTITY"
+printf "Signing macOS app bundle\n"
 codesign --force --deep --options runtime --timestamp \
   --sign "$APPLE_CODESIGN_IDENTITY" \
   "$APP_BUNDLE"
 
 codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
-codesign -dv --verbose=2 "$APP_BUNDLE" 2>&1 | sed -n '1,80p'
 
 printf "Creating notarization archive\n"
 ditto -c -k --keepParent "$APP_BUNDLE" "$notary_zip"
