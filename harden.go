@@ -111,11 +111,7 @@ func npmGuardrailStatus() PackageManagerStatus {
 
 	values := map[string]string{}
 	for _, key := range []string{"min-release-age", "save-exact", "allow-git", "ignore-scripts"} {
-		value := commandOutput(context.Background(), npmPath, "config", "get", key, "--location=user")
-		if value == "" {
-			value = "null"
-		}
-		values[key] = value
+		values[key] = npmConfigValue(npmPath, key)
 	}
 	recommended, _ := npmHardenPreset("recommended")
 	for _, setting := range recommended.Settings {
@@ -291,6 +287,51 @@ func commandOutput(ctx context.Context, name string, args ...string) string {
 		return ""
 	}
 	return strings.TrimSpace(string(out))
+}
+
+func npmConfigValue(npmPath string, key string) string {
+	if key == "min-release-age" {
+		if value, ok := npmUserConfigValue(npmPath, key); ok {
+			return value
+		}
+	}
+	value := commandOutput(context.Background(), npmPath, "config", "get", key, "--location=user")
+	if value == "" {
+		return "null"
+	}
+	return value
+}
+
+func npmUserConfigValue(npmPath string, key string) (string, bool) {
+	configPath := commandOutput(context.Background(), npmPath, "config", "get", "userconfig")
+	if configPath == "" || configPath == "null" {
+		return "", false
+	}
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return "", false
+	}
+	return parseNPMConfigValue(string(data), key)
+}
+
+func parseNPMConfigValue(contents string, key string) (string, bool) {
+	for _, line := range strings.Split(contents, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, ";") {
+			continue
+		}
+		name, value, ok := strings.Cut(line, "=")
+		if !ok || strings.TrimSpace(name) != key {
+			continue
+		}
+		value = strings.TrimSpace(value)
+		value = strings.Trim(value, `"'`)
+		if value == "" {
+			return "null", true
+		}
+		return value, true
+	}
+	return "", false
 }
 
 func runPackageCommand(ctx context.Context, name string, args ...string) error {

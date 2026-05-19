@@ -91,3 +91,21 @@ func TestGuardrailStatusForKey(t *testing.T) {
 		})
 	}
 }
+
+func TestParseNPMConfigValue(t *testing.T) {
+	contents := `
+; comment
+save-exact=true
+min-release-age=7
+save-prefix=""
+`
+	if got, ok := parseNPMConfigValue(contents, "min-release-age"); !ok || got != "7" {
+		t.Fatalf("parseNPMConfigValue(min-release-age) = %q, %v; want 7, true", got, ok)
+	}
+	if got, ok := parseNPMConfigValue(contents, "save-prefix"); !ok || got != "null" {
+		t.Fatalf("parseNPMConfigValue(save-prefix) = %q, %v; want null, true", got, ok)
+	}
+	if got, ok := parseNPMConfigValue(contents, "missing"); ok || got != "" {
+		t.Fatalf("parseNPMConfigValue(missing) = %q, %v; want empty, false", got, ok)
+	}
+}
