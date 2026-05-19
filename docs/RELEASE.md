@@ -68,6 +68,36 @@ To build only the desktop app bundle:
 make build
 ```
 
+## Signed macOS Releases
+
+Tag builds require Apple signing and notarization secrets. Branch builds can still produce unsigned validation artifacts when those secrets are not configured.
+
+Required repository secrets:
+
+- `APPLE_CERTIFICATE_P12_BASE64`: base64-encoded Developer ID Application `.p12`
+- `APPLE_CERTIFICATE_PASSWORD`: password used when exporting the `.p12`
+- `APPLE_CODESIGN_IDENTITY`: exact signing identity, for example `Developer ID Application: Turen Labs, Inc. (5Q9UJQ9MPK)`
+- `APPLE_NOTARY_KEY_P8_BASE64`: base64-encoded App Store Connect API key `.p8`
+- `APPLE_NOTARY_KEY_ID`: App Store Connect API key ID
+- `APPLE_NOTARY_ISSUER_ID`: App Store Connect API issuer ID
+
+The release workflow creates a temporary keychain, imports the `.p12`, signs the Wails app with hardened runtime, submits the app zip to Apple notarization, staples the ticket, verifies with `codesign`, `stapler`, and `spctl`, then writes the final macOS app zip under `dist/`.
+
+Local helper commands for secret material:
+
+```bash
+openssl pkcs12 -export \
+  -inkey ~/.spice-signing/TurenLabsInc_DeveloperID_G2.key \
+  -in ~/.spice-signing/developerID_application.pem \
+  -name "Developer ID Application: Turen Labs, Inc. (5Q9UJQ9MPK)" \
+  -out ~/.spice-signing/TurenLabsInc_DeveloperID_G2.p12
+
+base64 -i ~/.spice-signing/TurenLabsInc_DeveloperID_G2.p12 | tr -d '\n'
+base64 -i ~/Downloads/AuthKey_XXXXXXXXXX.p8 | tr -d '\n'
+```
+
+Never commit certificate exports, private keys, App Store Connect API keys, or printed base64 secrets.
+
 ## Checksums
 
 `make checksums` computes SHA-256 sums for all files in `dist/` except `SHA256SUMS` itself:
