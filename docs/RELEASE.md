@@ -90,7 +90,7 @@ Or the Apple ID/app-specific-password secrets used by the Turen Agent release fl
 - `APPLE_ID_PASSWORD`: app-specific password for that Apple ID
 - `APPLE_TEAM_ID`: Apple Developer Team ID
 
-The release workflow creates a temporary keychain, imports the `.p12`, signs the Darwin CLI binaries in the release tarballs, signs the Wails app with hardened runtime, submits the app zip to Apple notarization, staples the ticket, verifies with `codesign`, `stapler`, and `spctl`, then writes the final macOS app zip under `dist/`.
+The release workflow creates a temporary keychain, imports the `.p12`, signs and notarizes the Darwin CLI binaries in the release tarballs, signs the Wails app with hardened runtime, submits the app zip to Apple notarization, staples the app ticket, verifies with `codesign`, `stapler`, and `spctl`, then writes the final macOS app zip under `dist/`.
 
 Local helper commands for secret material:
 

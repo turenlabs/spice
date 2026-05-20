@@ -53,7 +53,7 @@ keychain="$tmpdir/signing.keychain-db"
 keychain_password="$(openssl rand -hex 24)"
 p12="$tmpdir/certificate.p12"
 notary_key="$tmpdir/notary-key.p8"
-notary_zip="$tmpdir/notary.zip"
+notary_zip="$tmpdir/app-notary.zip"
 
 cleanup() {
   security delete-keychain "$keychain" >/dev/null 2>&1 || true
@@ -92,8 +92,26 @@ security set-key-partition-list \
   -k "$keychain_password" \
   "$keychain"
 
+submit_notarization() {
+  local archive="$1"
+
+  if [[ "$notary_auth" == "api-key" ]]; then
+    xcrun notarytool submit "$archive" \
+      --key "$notary_key" \
+      --key-id "$APPLE_NOTARY_KEY_ID" \
+      --issuer "$APPLE_NOTARY_ISSUER_ID" \
+      --wait
+  else
+    xcrun notarytool submit "$archive" \
+      --apple-id "$APPLE_ID" \
+      --password "$APPLE_ID_PASSWORD" \
+      --team-id "$APPLE_TEAM_ID" \
+      --wait
+  fi
+}
+
 sign_darwin_cli_archives() {
-  local archive binary workdir inner
+  local archive binary workdir inner cli_notary_zip
 
   shopt -s nullglob
   for archive in "$DIST_DIR/${APP_NAME}_${VERSION}_darwin_"*.tar.gz; do
@@ -110,6 +128,11 @@ sign_darwin_cli_archives() {
       --sign "$APPLE_CODESIGN_IDENTITY" \
       "$binary"
     codesign --verify --strict --verbose=2 "$binary"
+
+    cli_notary_zip="$workdir/cli-notary.zip"
+    printf "Submitting macOS CLI notarization request\n"
+    ditto -c -k --keepParent "$binary" "$cli_notary_zip"
+    submit_notarization "$cli_notary_zip"
 
     inner="$(find "$workdir" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
     if [[ -z "$inner" ]]; then
@@ -135,19 +158,7 @@ printf "Creating notarization archive\n"
 ditto -c -k --keepParent "$APP_BUNDLE" "$notary_zip"
 
 printf "Submitting notarization request\n"
-if [[ "$notary_auth" == "api-key" ]]; then
-  xcrun notarytool submit "$notary_zip" \
-    --key "$notary_key" \
-    --key-id "$APPLE_NOTARY_KEY_ID" \
-    --issuer "$APPLE_NOTARY_ISSUER_ID" \
-    --wait
-else
-  xcrun notarytool submit "$notary_zip" \
-    --apple-id "$APPLE_ID" \
-    --password "$APPLE_ID_PASSWORD" \
-    --team-id "$APPLE_TEAM_ID" \
-    --wait
-fi
+submit_notarization "$notary_zip"
 
 printf "Stapling notarization ticket\n"
 xcrun stapler staple "$APP_BUNDLE"
