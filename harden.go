@@ -242,7 +242,7 @@ func guardrailStatusForKey(key, value string) string {
 func commandOutput(ctx context.Context, name string, args ...string) string {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, name, args...).CombinedOutput()
+	out, err := packageCommand(ctx, name, args...).CombinedOutput()
 	if err != nil {
 		return ""
 	}
@@ -295,7 +295,7 @@ func parseNPMConfigValue(contents string, key string) (string, bool) {
 }
 
 func runPackageCommand(ctx context.Context, name string, args ...string) error {
-	out, err := exec.CommandContext(ctx, name, args...).CombinedOutput()
+	out, err := packageCommand(ctx, name, args...).CombinedOutput()
 	if err != nil {
 		message := strings.TrimSpace(string(out))
 		if message == "" {
@@ -304,6 +304,58 @@ func runPackageCommand(ctx context.Context, name string, args ...string) error {
 		return errors.New(message)
 	}
 	return nil
+}
+
+func packageCommand(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Env = commandEnvWithPackageManagerPath(name)
+	return cmd
+}
+
+func commandEnvWithPackageManagerPath(executable string) []string {
+	pathParts := []string{}
+	if dir := filepath.Dir(executable); dir != "." && dir != string(filepath.Separator) {
+		pathParts = append(pathParts, dir)
+	}
+	pathParts = append(pathParts, "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin")
+
+	env := os.Environ()
+	existingPath := os.Getenv("PATH")
+	if existingPath != "" {
+		pathParts = append(pathParts, existingPath)
+	}
+	pathValue := strings.Join(dedupeNonEmpty(pathParts), string(os.PathListSeparator))
+	foundPath := false
+	for i, entry := range env {
+		if strings.HasPrefix(entry, "PATH=") {
+			env[i] = "PATH=" + pathValue
+			foundPath = true
+			break
+		}
+	}
+	if !foundPath {
+		env = append(env, "PATH="+pathValue)
+	}
+	return env
+}
+
+func dedupeNonEmpty(values []string) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		for _, part := range filepath.SplitList(value) {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			if _, ok := seen[part]; ok {
+				continue
+			}
+			seen[part] = struct{}{}
+			out = append(out, part)
+		}
+	}
+	return out
 }
 
 func findExecutable(name string) (string, error) {

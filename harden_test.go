@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"path/filepath"
+	"strings"
+	"testing"
+)
 
 func TestHardenPresetFromValues(t *testing.T) {
 	tests := []struct {
@@ -107,5 +111,28 @@ save-prefix=""
 	}
 	if got, ok := parseNPMConfigValue(contents, "missing"); ok || got != "" {
 		t.Fatalf("parseNPMConfigValue(missing) = %q, %v; want empty, false", got, ok)
+	}
+}
+
+func TestCommandEnvWithPackageManagerPath(t *testing.T) {
+	t.Setenv("PATH", "/usr/bin:/bin")
+
+	env := commandEnvWithPackageManagerPath("/opt/homebrew/bin/npm")
+	path := ""
+	for _, entry := range env {
+		if strings.HasPrefix(entry, "PATH=") {
+			path = strings.TrimPrefix(entry, "PATH=")
+			break
+		}
+	}
+	if path == "" {
+		t.Fatal("PATH was not set")
+	}
+	parts := filepath.SplitList(path)
+	if len(parts) == 0 || parts[0] != "/opt/homebrew/bin" {
+		t.Fatalf("PATH first entry = %q; want /opt/homebrew/bin", parts)
+	}
+	if strings.Count(path, "/opt/homebrew/bin") != 1 {
+		t.Fatalf("PATH should not duplicate /opt/homebrew/bin: %q", path)
 	}
 }
