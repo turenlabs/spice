@@ -92,6 +92,38 @@ security set-key-partition-list \
   -k "$keychain_password" \
   "$keychain"
 
+sign_darwin_cli_archives() {
+  local archive binary workdir inner
+
+  shopt -s nullglob
+  for archive in "$DIST_DIR/${APP_NAME}_${VERSION}_darwin_"*.tar.gz; do
+    printf "Signing macOS CLI archive %s\n" "$archive"
+    workdir="$(mktemp -d "$tmpdir/cli.XXXXXX")"
+    tar -C "$workdir" -xzf "$archive"
+    binary="$(find "$workdir" -type f -path "*/${APP_NAME}" -perm -111 | head -n 1)"
+    if [[ -z "$binary" ]]; then
+      printf "CLI binary not found in %s\n" "$archive" >&2
+      exit 1
+    fi
+
+    codesign --force --options runtime --timestamp \
+      --sign "$APPLE_CODESIGN_IDENTITY" \
+      "$binary"
+    codesign --verify --strict --verbose=2 "$binary"
+
+    inner="$(find "$workdir" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+    if [[ -z "$inner" ]]; then
+      printf "CLI archive root not found in %s\n" "$archive" >&2
+      exit 1
+    fi
+    rm -f "$archive"
+    tar -C "$workdir" -czf "$archive" "$(basename "$inner")"
+  done
+  shopt -u nullglob
+}
+
+sign_darwin_cli_archives
+
 printf "Signing macOS app bundle\n"
 codesign --force --deep --options runtime --timestamp \
   --sign "$APPLE_CODESIGN_IDENTITY" \

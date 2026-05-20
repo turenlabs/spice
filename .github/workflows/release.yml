@@ -104,6 +104,6 @@ jobs:
           body: |
             Spice is a free local Shai-Hulud exposure checker for developers.
 
-            This release includes CLI archives, a macOS app bundle, and SHA-256 checksums.
+            This release includes signed macOS CLI archives, Linux CLI archives, a signed and notarized macOS app bundle, and SHA-256 checksums.
 
             Detection data is loaded from the public `turenlabs/spice-detections` pack at runtime. A clean scan is a useful signal, not proof that a system is safe.
