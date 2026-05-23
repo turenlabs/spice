@@ -109,6 +109,41 @@ func TestComposerLockAffectedPackage(t *testing.T) {
 	assertFinding(t, dedupeFindings(findings), "affected-package", "intercom/intercom-php@5.0.2 in text manifest/lockfile")
 }
 
+func TestLaravelLangComposerLockAffectedPackage(t *testing.T) {
+	detection := NewMiniShaiHuludDetectionWithRemote(&RemoteDetectionPack{
+		ID:       "laravel-lang-2026-05",
+		Campaign: "Laravel Lang Composer compromise May 2026",
+		AffectedVersionsByEcosystem: map[string]map[string]map[string]bool{
+			"composer": {
+				"laravel-lang/lang":          {"14.3.7": true},
+				"laravel-lang/http-statuses": {"3.12.1": true},
+				"laravel-lang/attributes":    {"2.15.8": true},
+				"laravel-lang/actions":       {"1.12.4": true},
+			},
+		},
+	})
+	path := filepath.Join(t.TempDir(), "composer.lock")
+	data := []byte(`{
+		"packages": [
+			{"name": "laravel-lang/lang", "version": "14.3.7"},
+			{"name": "laravel-lang/http-statuses", "version": "3.12.1"}
+		],
+		"packages-dev": [
+			{"name": "laravel-lang/attributes", "version": "2.15.8"},
+			{"name": "laravel-lang/actions", "version": "1.12.4"}
+		]
+	}`)
+	var findings []Finding
+	detection.ScanFile(FileContext{Path: path, Base: filepath.Base(path), Slash: filepath.ToSlash(path), Data: data}, func(finding Finding) {
+		findings = append(findings, finding)
+	})
+	findings = dedupeFindings(findings)
+	assertFinding(t, findings, "affected-package", "laravel-lang/lang@14.3.7 in text manifest/lockfile")
+	assertFinding(t, findings, "affected-package", "laravel-lang/http-statuses@3.12.1 in text manifest/lockfile")
+	assertFinding(t, findings, "affected-package", "laravel-lang/attributes@2.15.8 in text manifest/lockfile")
+	assertFinding(t, findings, "affected-package", "laravel-lang/actions@1.12.4 in text manifest/lockfile")
+}
+
 func TestArchiveInspectionFindsEmbeddedMetadataAndIOC(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "mistralai-2.4.6-py3-none-any.whl")
 	file, err := os.Create(path)
