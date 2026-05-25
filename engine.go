@@ -468,9 +468,11 @@ func isAlwaysScanBase(base string) bool {
 		return true
 	case base == "uv.lock", base == "pdm.lock", base == "composer.json", base == "composer.lock":
 		return true
-	case base == "go.mod", base == "cargo.toml", base == "cargo.lock":
+	case base == "go.mod", base == "cargo.toml", base == "cargo.lock", base == "build.rs":
 		return true
 	case base == "metadata":
+		return true
+	case isAIAgentConfigBase(base):
 		return true
 	case strings.HasPrefix(base, "requirements") && strings.HasSuffix(base, ".txt"):
 		return true
@@ -674,13 +676,25 @@ func packageFromNodeModulesPath(location string) string {
 
 func textCandidate(path string) bool {
 	lower := strings.ToLower(path)
-	for _, suffix := range []string{".json", ".lock", ".yaml", ".yml", ".txt", ".log", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".py", ".toml", ".ini", ".cfg", ".conf", ".plist", ".service"} {
+	for _, suffix := range []string{".json", ".lock", ".yaml", ".yml", ".txt", ".log", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".py", ".rs", ".toml", ".ini", ".cfg", ".conf", ".plist", ".service"} {
 		if strings.HasSuffix(lower, suffix) {
 			return true
 		}
 	}
 	base := filepath.Base(lower)
-	return base == "package-lock.json" || base == "pnpm-lock.yaml" || base == "yarn.lock" || base == "metadata" || strings.HasPrefix(base, "requirements")
+	return base == "package-lock.json" || base == "pnpm-lock.yaml" || base == "yarn.lock" || base == "metadata" || isAIAgentConfigBase(base) || strings.HasPrefix(base, "requirements")
+}
+
+// isAIAgentConfigBase reports whether base is an AI-agent instruction/config file.
+// Campaigns inject hidden instructions into these to coerce assistants into running
+// payloads, so their contents must be IOC-scanned even without a normal text extension.
+func isAIAgentConfigBase(base string) bool {
+	switch base {
+	case ".cursorrules", "claude.md", "agents.md":
+		return true
+	default:
+		return false
+	}
 }
 
 func dedupeFindings(findings []Finding) []Finding {

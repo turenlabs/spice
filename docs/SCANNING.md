@@ -35,10 +35,12 @@ Candidate selection lives in `engine.go`.
 
 Always scan:
 
-- package manifests and lockfiles
+- package manifests and lockfiles (npm, PyPI, Composer, Go, and Cargo `Cargo.toml`/`Cargo.lock`)
 - package archives
 - Python `METADATA`
 - Dockerfiles
+- crates build scripts (`build.rs`)
+- AI-agent instruction files (`.cursorrules`, `CLAUDE.md`, `AGENTS.md`) — injection vector for fake "security scan" payloads
 - startup/token-sensitive paths
 - remote incident filenames
 

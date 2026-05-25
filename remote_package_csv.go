@@ -118,6 +118,8 @@ func normalizePackageEcosystem(value string) string {
 		return "npm"
 	case "composer", "packagist", "php":
 		return "composer"
+	case "crates", "crates.io", "cargo", "rust":
+		return "crates"
 	default:
 		return strings.ToLower(strings.TrimSpace(value))
 	}
