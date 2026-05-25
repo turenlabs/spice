@@ -6,7 +6,7 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
-	"crypto/sha1"
+	"crypto/sha1" // batou:ignore BATOU-AST-005 -- matches published SHA-1 malware-hash IOCs, not a security primitive
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -144,7 +144,7 @@ func (d *MiniShaiHuludDetection) ScanFile(file FileContext, emit EmitFinding) {
 		d.scanPackageJSON(file, emit)
 	case "package-lock.json":
 		d.scanPackageLock(file, emit)
-	case "pnpm-lock.yaml", "yarn.lock", "poetry.lock", "pyproject.toml", "npm-shrinkwrap.json", "pipfile.lock", "uv.lock", "pdm.lock", "composer.json", "composer.lock":
+	case "pnpm-lock.yaml", "yarn.lock", "poetry.lock", "pyproject.toml", "npm-shrinkwrap.json", "pipfile.lock", "uv.lock", "pdm.lock", "composer.json", "composer.lock", "cargo.toml", "cargo.lock":
 		d.scanTextManifest(file, emit)
 	case "metadata":
 		d.scanPythonMetadata(file, emit)
@@ -603,7 +603,7 @@ func (d *MiniShaiHuludDetection) scanArchiveMember(archivePath, memberName strin
 		d.scanPackageJSON(member, emit)
 	case "metadata":
 		d.scanPythonMetadata(member, emit)
-	case "composer.json", "composer.lock", "package-lock.json", "npm-shrinkwrap.json", "pnpm-lock.yaml", "yarn.lock", "poetry.lock", "pyproject.toml", "pipfile.lock", "uv.lock", "pdm.lock":
+	case "composer.json", "composer.lock", "package-lock.json", "npm-shrinkwrap.json", "pnpm-lock.yaml", "yarn.lock", "poetry.lock", "pyproject.toml", "pipfile.lock", "uv.lock", "pdm.lock", "cargo.toml", "cargo.lock":
 		d.scanTextManifest(member, emit)
 	default:
 		lowerBase := strings.ToLower(base)
@@ -829,6 +829,8 @@ func manifestEcosystem(file FileContext) string {
 		return "pypi"
 	case "composer.json", "composer.lock":
 		return "composer"
+	case "cargo.toml", "cargo.lock":
+		return "crates"
 	default:
 		if strings.HasPrefix(base, "requirements") && strings.HasSuffix(base, ".txt") {
 			return "pypi"

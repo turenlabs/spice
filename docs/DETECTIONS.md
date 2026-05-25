@@ -80,6 +80,8 @@ Product and developer copy should describe findings as exposure or triage eviden
 
 Use the remote detection pack when possible. Change engine code only when a detection requires new parsing, archive handling, package inventory support, or composite behavior that cannot be expressed as data.
 
+Pack IOC regexes only run against files the engine content-scans. Covered ecosystems include npm, PyPI, Composer, and crates (`Cargo.toml`/`Cargo.lock` map to the `crates` ecosystem). Crates build scripts (`build.rs`) and AI-agent instruction files (`.cursorrules`, `CLAUDE.md`, `AGENTS.md`) are content-scanned so payload and prompt-injection IOCs can match. Adding a new ecosystem or file class requires an engine change (`manifestEcosystem`, `normalizePackageEcosystem`, `textCandidate`, `isAlwaysScanBase`).
+
 Add tests in the engine repo for parser/engine behavior. Add pack-specific fixtures/tests in the detection pack repo when the scanner already supports the needed rule type.
 
 ## False Positives
