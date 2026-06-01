@@ -359,6 +359,9 @@ func classifyScanFile(path string, size int64, suspicious map[string]bool) scanD
 	if isAlwaysScanBase(base) || suspicious[base] || isStartupOrTokenPath(slash) {
 		return scanContent
 	}
+	if isCIWorkflowPath(slash) && textCandidate(path) {
+		return scanContent
+	}
 	if isPackageArchiveBase(base) {
 		if shouldScanPackageArchive(size) {
 			return scanContent
@@ -397,6 +400,9 @@ func classifyShaiHuludVectorFile(path string, size int64, suspicious map[string]
 	if isShaiHuludWorkspacePath(slash) && textCandidate(path) {
 		return scanContent
 	}
+	if isCIWorkflowPath(slash) && textCandidate(path) {
+		return scanContent
+	}
 	if isPackageCachePath(slash) {
 		switch {
 		case textCandidate(path):
@@ -423,6 +429,16 @@ func isShaiHuludArtifactBase(base string) bool {
 
 func isShaiHuludWorkspacePath(slash string) bool {
 	return strings.Contains(slash, "/.claude/") || strings.Contains(slash, "/.vscode/")
+}
+
+// isCIWorkflowPath reports whether slash is a GitHub Actions workflow file.
+// Workflow YAML is a recurring supply-chain payload host: the Shai-Hulud family
+// (and the Miasma variant) plant a malicious release/discussion workflow that
+// publishes via OIDC, so these files are content-scanned in every profile rather
+// than only deep scans. A workflow file is not suspicious by presence; malicious
+// ones are gated by composite IOCs.
+func isCIWorkflowPath(slash string) bool {
+	return strings.Contains(slash, ".github/workflows/")
 }
 
 func isPackageCachePath(slash string) bool {

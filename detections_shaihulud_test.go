@@ -442,6 +442,50 @@ func TestTrapDoorEngineScanGates(t *testing.T) {
 	}
 }
 
+func TestCIWorkflowPathIsContentScanned(t *testing.T) {
+	if !isCIWorkflowPath(".github/workflows/release.yml") {
+		t.Fatal("expected .github/workflows path to be recognized as a workflow file")
+	}
+	if isCIWorkflowPath("config/release.yml") {
+		t.Fatal("yaml outside .github/workflows should not be treated as a workflow file")
+	}
+	if got := classifyScanFile(".github/workflows/release.yml", 2048, nil); got != scanContent {
+		t.Fatalf("workflow yaml: classifyScanFile = %v, want scanContent", got)
+	}
+	if got := classifyShaiHuludVectorFile(".github/workflows/release.yml", 2048, nil); got != scanContent {
+		t.Fatalf("workflow yaml (shai-hulud profile): classifyShaiHuludVectorFile = %v, want scanContent", got)
+	}
+	// A non-workflow yaml stays metadata-only in the default profile.
+	if got := classifyScanFile("config/settings.yml", 2048, nil); got != scanMetadataOnly {
+		t.Fatalf("non-workflow yaml: classifyScanFile = %v, want scanMetadataOnly", got)
+	}
+}
+
+func miasmaRemotePack() *RemoteDetectionPack {
+	return &RemoteDetectionPack{
+		ID:       "miasma-2026-06",
+		Campaign: "Miasma: The Spreading Blight (Red Hat npm) June 2026",
+		AffectedVersionsByEcosystem: map[string]map[string]map[string]bool{
+			"npm": {"@redhat-cloud-services/frontend-components": {"7.7.2": true}},
+		},
+		IOCs: []RemoteIOC{
+			{Label: "Miasma OIDC publish-workflow env marker", Severity: "high", Pattern: `(?i)\bOIDC_PACKAGES\b`},
+		},
+		CompositeIOCs: []RemoteCompositeIOC{{
+			Label:      "Miasma OIDC release workflow payload",
+			Severity:   "critical",
+			MinMatches: 3,
+			Signals: []RemoteIOC{
+				{Label: "Bun payload invocation", Pattern: `(?i)bun\s+run\s+_?index\.js`},
+				{Label: "OIDC packages env", Pattern: `(?i)\bOIDC_PACKAGES\b`},
+				{Label: "id-token write permission", Pattern: `(?i)id-token\s*:\s*write`},
+				{Label: "pinned malicious setup-bun action", Pattern: `(?i)oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6`},
+				{Label: "pinned malicious checkout action", Pattern: `(?i)actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd`},
+			},
+		}},
+	}
+}
+
 func scanFixture(t *testing.T, fixture string) []Finding {
 	t.Helper()
 
