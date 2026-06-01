@@ -133,6 +133,59 @@ func TestTrapDoorPipelineScansBuildRSAndCursorrules(t *testing.T) {
 	}
 }
 
+func TestMiasmaPipelineScansWorkflowYAML(t *testing.T) {
+	dir := t.TempDir()
+	malicious := []byte(`name: release
+on:
+  push:
+permissions:
+  id-token: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+      - run: bun run _index.js
+        env:
+          OIDC_PACKAGES: ${{ steps.collect.outputs.pkgs }}
+`)
+	benign := []byte("name: ci\non: [push]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm test\n")
+	files := map[string][]byte{
+		filepath.Join(".github", "workflows", "release.yml"): malicious,
+		filepath.Join(".github", "workflows", "ci.yml"):      benign,
+	}
+	for rel, data := range files {
+		path := filepath.Join(dir, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	scanner := NewScannerWithOptions(nil, nil)
+	scanner.UseRemoteDetectionBundle(&RemoteDetectionBundle{Packs: []*RemoteDetectionPack{miasmaRemotePack()}, Fingerprint: "test"})
+	findings, err := scanner.Scan([]string{dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var workflowHit bool
+	for _, finding := range findings {
+		if strings.Contains(finding.Path, filepath.Join(".github", "workflows", "ci.yml")) {
+			t.Fatalf("benign workflow should not produce a finding: %#v", finding)
+		}
+		if strings.HasSuffix(finding.Path, "release.yml") && strings.Contains(finding.Evidence, "OIDC release workflow") {
+			workflowHit = true
+		}
+	}
+	if !workflowHit {
+		t.Fatalf("expected Miasma OIDC workflow composite finding from default-profile scan, got %#v", findings)
+	}
+}
+
 func TestReferencePathDemotionCoversArchiveMemberPaths(t *testing.T) {
 	finding := enrichFinding(Finding{
 		DetectionID: "test",
