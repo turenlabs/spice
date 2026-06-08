@@ -853,9 +853,11 @@ func ecosystemAliases(ecosystem string) []string {
 func (d *MiniShaiHuludDetection) hashCandidate(base string) bool {
 	base = strings.ToLower(base)
 	return d.suspiciousFilename[base] ||
+		base == "_index.js" ||
 		base == "bundle.js" ||
 		base == "composer.json" ||
 		base == "composer.lock" ||
+		strings.HasSuffix(base, ".pth") ||
 		strings.HasSuffix(base, ".tgz") ||
 		strings.HasSuffix(base, ".tar") ||
 		strings.HasSuffix(base, ".tar.gz") ||

