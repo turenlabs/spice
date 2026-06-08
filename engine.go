@@ -452,6 +452,9 @@ func isPackageCachePath(slash string) bool {
 }
 
 func isDependencyLoaderCandidate(base string) bool {
+	if base == "_index.js" || strings.HasSuffix(base, ".pth") {
+		return true
+	}
 	return strings.Contains(base, "install") ||
 		strings.Contains(base, "setup") ||
 		strings.Contains(base, "runtime") ||
@@ -692,7 +695,7 @@ func packageFromNodeModulesPath(location string) string {
 
 func textCandidate(path string) bool {
 	lower := strings.ToLower(path)
-	for _, suffix := range []string{".json", ".lock", ".yaml", ".yml", ".txt", ".log", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".py", ".rs", ".toml", ".ini", ".cfg", ".conf", ".plist", ".service"} {
+	for _, suffix := range []string{".json", ".lock", ".yaml", ".yml", ".txt", ".log", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".py", ".rs", ".toml", ".ini", ".cfg", ".conf", ".plist", ".service", ".pth"} {
 		if strings.HasSuffix(lower, suffix) {
 			return true
 		}
