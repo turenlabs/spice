@@ -359,6 +359,9 @@ func classifyScanFile(path string, size int64, suspicious map[string]bool) scanD
 	if isAlwaysScanBase(base) || suspicious[base] || isStartupOrTokenPath(slash) {
 		return scanContent
 	}
+	if isRepoOpenExecutionPath(slash) && textCandidate(path) {
+		return scanContent
+	}
 	if isCIWorkflowPath(slash) && textCandidate(path) {
 		return scanContent
 	}
@@ -428,7 +431,33 @@ func isShaiHuludArtifactBase(base string) bool {
 }
 
 func isShaiHuludWorkspacePath(slash string) bool {
-	return strings.Contains(slash, "/.claude/") || strings.Contains(slash, "/.vscode/")
+	return strings.Contains(withLeadingSlash(slash), "/.claude/") ||
+		strings.Contains(withLeadingSlash(slash), "/.gemini/") ||
+		strings.Contains(withLeadingSlash(slash), "/.cursor/rules/") ||
+		strings.Contains(withLeadingSlash(slash), "/.vscode/") ||
+		isRepoOpenPayloadPath(slash)
+}
+
+func isRepoOpenExecutionPath(slash string) bool {
+	slash = withLeadingSlash(slash)
+	return strings.HasSuffix(slash, "/.claude/settings.json") ||
+		strings.HasSuffix(slash, "/.gemini/settings.json") ||
+		strings.Contains(slash, "/.cursor/rules/") ||
+		strings.HasSuffix(slash, "/.vscode/tasks.json") ||
+		isRepoOpenPayloadPath(slash)
+}
+
+func isRepoOpenPayloadPath(slash string) bool {
+	slash = withLeadingSlash(slash)
+	return strings.HasSuffix(slash, "/.github/setup.js") ||
+		strings.HasSuffix(slash, "/.github/setup.mjs")
+}
+
+func withLeadingSlash(slash string) string {
+	if strings.HasPrefix(slash, "/") {
+		return slash
+	}
+	return "/" + slash
 }
 
 // isCIWorkflowPath reports whether slash is a GitHub Actions workflow file.
@@ -695,7 +724,7 @@ func packageFromNodeModulesPath(location string) string {
 
 func textCandidate(path string) bool {
 	lower := strings.ToLower(path)
-	for _, suffix := range []string{".json", ".lock", ".yaml", ".yml", ".txt", ".log", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".py", ".rs", ".toml", ".ini", ".cfg", ".conf", ".plist", ".service", ".pth"} {
+	for _, suffix := range []string{".json", ".lock", ".yaml", ".yml", ".txt", ".log", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".py", ".rs", ".toml", ".ini", ".cfg", ".conf", ".plist", ".service", ".pth", ".md", ".mdc"} {
 		if strings.HasSuffix(lower, suffix) {
 			return true
 		}
