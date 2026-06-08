@@ -41,6 +41,7 @@ Always scan:
 - Dockerfiles
 - crates build scripts (`build.rs`)
 - AI-agent instruction files (`.cursorrules`, `CLAUDE.md`, `AGENTS.md`) — injection vector for fake "security scan" payloads
+- Repo-open AI/editor execution config (`.claude/settings.json`, `.gemini/settings.json`, `.cursor/rules/*`, `.vscode/tasks.json`, `.github/setup.js`/`.mjs`) — Miasma-style trigger paths that can execute or instruct tools to run payloads when a repository is opened
 - GitHub Actions workflow files (`.github/workflows/*.yml`/`.yaml`, via `isCIWorkflowPath`) — recurring Shai-Hulud/Miasma payload host, where a malicious `release` workflow publishes via OIDC. Presence is not suspicious; malicious workflows are gated by composite IOCs.
 - startup/token-sensitive paths
 - remote incident filenames

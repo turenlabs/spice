@@ -526,7 +526,7 @@ func TestTrapDoorCratesRowDoesNotMatchNpmEcosystem(t *testing.T) {
 }
 
 func TestTrapDoorEngineScanGates(t *testing.T) {
-	for _, path := range []string{"crate/build.rs", "repo/.cursorrules", "repo/CLAUDE.md", "repo/AGENTS.md"} {
+	for _, path := range []string{"crate/build.rs", "repo/.cursorrules", "repo/CLAUDE.md", "repo/AGENTS.md", "repo/.cursor/rules/setup.mdc"} {
 		if !textCandidate(path) {
 			t.Errorf("expected %q to be a text candidate", path)
 		}
@@ -541,6 +541,33 @@ func TestTrapDoorEngineScanGates(t *testing.T) {
 		if got := normalizePackageEcosystem(alias); got != "crates" {
 			t.Errorf("normalizePackageEcosystem(%q) = %q, want crates", alias, got)
 		}
+	}
+}
+
+func TestRepoOpenExecutionPathsAreContentScanned(t *testing.T) {
+	for _, path := range []string{
+		".claude/settings.json",
+		"repo/.gemini/settings.json",
+		"repo/.cursor/rules/setup.mdc",
+		"repo/.vscode/tasks.json",
+		"repo/.github/setup.js",
+		"/tmp/repo/.github/setup.mjs",
+	} {
+		if !isRepoOpenExecutionPath(strings.ToLower(filepath.ToSlash(path))) {
+			t.Errorf("expected %q to be recognized as a repo-open execution path", path)
+		}
+		if got := classifyScanFile(path, 2048, nil); got != scanContent {
+			t.Errorf("%q: classifyScanFile = %v, want scanContent", path, got)
+		}
+		if got := classifyShaiHuludVectorFile(path, 2048, nil); got != scanContent {
+			t.Errorf("%q: classifyShaiHuludVectorFile = %v, want scanContent", path, got)
+		}
+	}
+	if got := classifyScanFile("repo/.cursor/rules/notes.txt", 2048, nil); got != scanContent {
+		t.Fatalf("cursor rule text should be scanned: got %v", got)
+	}
+	if got := classifyScanFile("repo/.github/ordinary.js", 2048, nil); got != scanMetadataOnly {
+		t.Fatalf("ordinary .github JS should remain metadata-only: got %v", got)
 	}
 }
 
@@ -573,18 +600,31 @@ func miasmaRemotePack() *RemoteDetectionPack {
 		IOCs: []RemoteIOC{
 			{Label: "Miasma OIDC publish-workflow env marker", Severity: "high", Pattern: `(?i)\bOIDC_PACKAGES\b`},
 		},
-		CompositeIOCs: []RemoteCompositeIOC{{
-			Label:      "Miasma OIDC release workflow payload",
-			Severity:   "critical",
-			MinMatches: 3,
-			Signals: []RemoteIOC{
-				{Label: "Bun payload invocation", Pattern: `(?i)bun\s+run\s+_?index\.js`},
-				{Label: "OIDC packages env", Pattern: `(?i)\bOIDC_PACKAGES\b`},
-				{Label: "id-token write permission", Pattern: `(?i)id-token\s*:\s*write`},
-				{Label: "pinned malicious setup-bun action", Pattern: `(?i)oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6`},
-				{Label: "pinned malicious checkout action", Pattern: `(?i)actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd`},
+		CompositeIOCs: []RemoteCompositeIOC{
+			{
+				Label:      "Miasma OIDC release workflow payload",
+				Severity:   "critical",
+				MinMatches: 3,
+				Signals: []RemoteIOC{
+					{Label: "Bun payload invocation", Pattern: `(?i)bun\s+run\s+_?index\.js`},
+					{Label: "OIDC packages env", Pattern: `(?i)\bOIDC_PACKAGES\b`},
+					{Label: "id-token write permission", Pattern: `(?i)id-token\s*:\s*write`},
+					{Label: "pinned malicious setup-bun action", Pattern: `(?i)oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6`},
+					{Label: "pinned malicious checkout action", Pattern: `(?i)actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd`},
+				},
 			},
-		}},
+			{
+				Label:      "Miasma repo-open AI/IDE payload trigger",
+				Severity:   "critical",
+				MinMatches: 2,
+				Signals: []RemoteIOC{
+					{Label: "hidden setup.js payload handoff", Pattern: `(?i)node\s+\.github/setup\.js`},
+					{Label: "Claude or Gemini SessionStart hook", Pattern: `(?i)\bSessionStart\b`},
+					{Label: "Cursor always-apply setup rule", Pattern: `(?i)alwaysApply\s*:\s*true`},
+					{Label: "VS Code folder-open task", Pattern: `(?i)runOn\s*"?\s*:\s*"?folderOpen`},
+				},
+			},
+		},
 	}
 }
 
