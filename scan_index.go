@@ -51,7 +51,7 @@ type indexedFile struct {
 	LastScannedAt time.Time
 }
 
-const scanEngineVersion = "2026-05-13-remote-rules-v2"
+const scanEngineVersion = "2026-06-20-phantom-gyp"
 const inventoryFTSVersion = "2026-05-16-inventory-fts-v1"
 
 const createPackageInventoryFTS = `CREATE VIRTUAL TABLE IF NOT EXISTS package_inventory_fts USING fts5(
