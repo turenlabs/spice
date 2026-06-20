@@ -46,7 +46,7 @@ Always scan:
 - startup/token-sensitive paths
 - remote incident filenames
 
-Project profile scans only dependency files likely to be loaders, such as setup/install/runtime/router/token filenames. Arbitrary dependency source files stay metadata-only unless deep scan is selected.
+Project profile scans only dependency files likely to be loaders, such as setup/install/runtime/router/token filenames, Python `.pth` files, and npm native-build `binding.gyp` files in package-cache paths. Arbitrary dependency source files stay metadata-only unless deep scan is selected.
 
 ## Cache Semantics
 

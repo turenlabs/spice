@@ -1,7 +1,10 @@
 package main
 
 import (
+	"archive/tar"
 	"archive/zip"
+	"bytes"
+	"compress/gzip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -590,6 +593,61 @@ func TestCIWorkflowPathIsContentScanned(t *testing.T) {
 	}
 }
 
+func TestBindingGypPackageLoaderIsContentScanned(t *testing.T) {
+	if !textCandidate("package/binding.gyp") {
+		t.Fatal("binding.gyp should be treated as text for archive IOC scanning")
+	}
+	if got := classifyScanFile("repo/node_modules/pkg/binding.gyp", 2048, nil); got != scanContent {
+		t.Fatalf("node_modules binding.gyp: classifyScanFile = %v, want scanContent", got)
+	}
+	if got := classifyScanFile("repo/native-addon/binding.gyp", 2048, nil); got != scanMetadataOnly {
+		t.Fatalf("source-tree binding.gyp should remain metadata-only in project profile: got %v", got)
+	}
+}
+
+func TestArchiveInspectionFindsPhantomGypBindingGyp(t *testing.T) {
+	var archive bytes.Buffer
+	gz := gzip.NewWriter(&archive)
+	tw := tar.NewWriter(gz)
+	payload := []byte(`{
+  "targets": [
+    {
+      "target_name": "Setup",
+      "type": "none",
+      "sources": ["<!(node index.js > /dev/null 2>&1 && echo stub.c)"]
+    }
+  ]
+}`)
+	header := &tar.Header{
+		Name: "package/binding.gyp",
+		Mode: 0o644,
+		Size: int64(len(payload)),
+	}
+	if err := tw.WriteHeader(header); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tw.Write(payload); err != nil {
+		t.Fatal(err)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	detection := NewMiniShaiHuludDetectionWithRemote(phantomGypRemotePack())
+	var findings []Finding
+	detection.ScanFile(FileContext{
+		Path: filepath.Join(t.TempDir(), "pkg-1.0.0.tgz"),
+		Base: "pkg-1.0.0.tgz",
+		Data: archive.Bytes(),
+	}, func(finding Finding) {
+		findings = append(findings, finding)
+	})
+	assertSeverityContains(t, dedupeFindings(findings), "critical", "ioc-string", "Phantom Gyp install-time node execution: 100% match")
+}
+
 func miasmaRemotePack() *RemoteDetectionPack {
 	return &RemoteDetectionPack{
 		ID:       "miasma-2026-06",
@@ -622,6 +680,27 @@ func miasmaRemotePack() *RemoteDetectionPack {
 					{Label: "Claude or Gemini SessionStart hook", Pattern: `(?i)\bSessionStart\b`},
 					{Label: "Cursor always-apply setup rule", Pattern: `(?i)alwaysApply\s*:\s*true`},
 					{Label: "VS Code folder-open task", Pattern: `(?i)runOn\s*"?\s*:\s*"?folderOpen`},
+				},
+			},
+		},
+	}
+}
+
+func phantomGypRemotePack() *RemoteDetectionPack {
+	return &RemoteDetectionPack{
+		ID:       "phantom-gyp-2026-06",
+		Campaign: "Miasma Phantom Gyp npm compromise June 2026",
+		CompositeIOCs: []RemoteCompositeIOC{
+			{
+				Label:      "Phantom Gyp install-time node execution",
+				Severity:   "critical",
+				MinMatches: 3,
+				Signals: []RemoteIOC{
+					{Label: "gyp targets block", Pattern: `(?i)"targets"\s*:`},
+					{Label: "setup target", Pattern: `(?i)"target_name"\s*:\s*"Setup"`},
+					{Label: "node index.js command substitution", Pattern: `(?i)<!\(\s*node\s+index\.js`},
+					{Label: "silent execution", Pattern: `(?i)>\s*/dev/null\s+2>&1`},
+					{Label: "stub source fallback", Pattern: `(?i)echo\s+stub\.c`},
 				},
 			},
 		},
