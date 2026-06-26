@@ -267,6 +267,62 @@ Prefer the repository formatter.`),
 	}
 }
 
+func TestMiasmaPipelineScansLeoAIToolPersistencePaths(t *testing.T) {
+	dir := t.TempDir()
+	payload := []byte(`Alright Lets See If This Works
+.windsurfrules .github/copilot-instructions.md mcp.json .aider.conf.yml
+VARIABLE_STORE format-results.txt WORKFLOW_ID REPO_ID_SUFFIX
+bun run _index.js
+`)
+	files := map[string][]byte{
+		".windsurfrules": payload,
+		filepath.Join(".github", "copilot-instructions.md"): payload,
+		"mcp.json":        payload,
+		".aider.conf.yml": payload,
+		"ordinary.md":     payload,
+	}
+	for rel, data := range files {
+		path := filepath.Join(dir, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	scanner := NewScannerWithOptions(nil, nil)
+	scanner.UseRemoteDetectionBundle(&RemoteDetectionBundle{Packs: []*RemoteDetectionPack{miasmaRemotePack()}, Fingerprint: "test"})
+	findings, err := scanner.Scan([]string{dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := map[string]bool{
+		".windsurfrules": false,
+		filepath.Join(".github", "copilot-instructions.md"): false,
+		"mcp.json":        false,
+		".aider.conf.yml": false,
+	}
+	for _, finding := range findings {
+		if strings.HasSuffix(finding.Path, "ordinary.md") {
+			t.Fatalf("ordinary markdown should remain metadata-only in default scan: %#v", finding)
+		}
+		if strings.Contains(finding.Evidence, "Leo/RStreams AI-tool persistence and workflow artifacts") {
+			for suffix := range want {
+				if strings.HasSuffix(finding.Path, suffix) {
+					want[suffix] = true
+				}
+			}
+		}
+	}
+	for suffix, hit := range want {
+		if !hit {
+			t.Fatalf("expected Leo/RStreams AI-tool persistence finding for %s, got %#v", suffix, findings)
+		}
+	}
+}
+
 func TestReferencePathDemotionCoversArchiveMemberPaths(t *testing.T) {
 	finding := enrichFinding(Finding{
 		DetectionID: "test",

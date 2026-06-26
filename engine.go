@@ -435,15 +435,18 @@ func isShaiHuludWorkspacePath(slash string) bool {
 		strings.Contains(withLeadingSlash(slash), "/.gemini/") ||
 		strings.Contains(withLeadingSlash(slash), "/.cursor/rules/") ||
 		strings.Contains(withLeadingSlash(slash), "/.vscode/") ||
-		isRepoOpenPayloadPath(slash)
+		isRepoOpenExecutionPath(slash)
 }
 
 func isRepoOpenExecutionPath(slash string) bool {
 	slash = withLeadingSlash(slash)
+	base := filepath.Base(slash)
 	return strings.HasSuffix(slash, "/.claude/settings.json") ||
 		strings.HasSuffix(slash, "/.gemini/settings.json") ||
 		strings.Contains(slash, "/.cursor/rules/") ||
 		strings.HasSuffix(slash, "/.vscode/tasks.json") ||
+		strings.HasSuffix(slash, "/.github/copilot-instructions.md") ||
+		isAIAgentConfigBase(base) ||
 		isRepoOpenPayloadPath(slash)
 }
 
@@ -738,7 +741,7 @@ func textCandidate(path string) bool {
 // payloads, so their contents must be IOC-scanned even without a normal text extension.
 func isAIAgentConfigBase(base string) bool {
 	switch base {
-	case ".cursorrules", "claude.md", "agents.md":
+	case ".aider.conf.yml", ".cursorrules", ".windsurfrules", "claude.md", "agents.md", "mcp.json":
 		return true
 	default:
 		return false
