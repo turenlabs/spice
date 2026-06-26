@@ -285,6 +285,48 @@ const runtime = "bun run _index.js oven-sh/bun/releases/download";
 	assertSeverityContains(t, findings, "critical", "ioc-string", "Hades Bun JavaScript credential stealer")
 }
 
+func TestLeoRStreamsNpmPackageAndPayloadMarkers(t *testing.T) {
+	detection := NewMiniShaiHuludDetectionWithRemote(miasmaRemotePack())
+	packagePath := filepath.Join(t.TempDir(), "package.json")
+	packageData := []byte(`{"dependencies":{"leo-sdk":"6.0.19"}}`)
+	var packageFindings []Finding
+	detection.ScanFile(FileContext{Path: packagePath, Base: filepath.Base(packagePath), Slash: filepath.ToSlash(packagePath), Data: packageData}, func(finding Finding) {
+		packageFindings = append(packageFindings, finding)
+	})
+	assertFinding(t, dedupeFindings(packageFindings), "affected-package", "leo-sdk@6.0.19 in dependencies")
+
+	payloadPath := filepath.Join(t.TempDir(), "index.js")
+	payloadData := []byte(`const repoDescription = "Alright Lets See If This Works";
+const relay = "RevokeAndItGoesKaboom";
+const result = "results/results-123-1.json format-results Run Copilot";
+const github = "https://api.github.com/user/repos";
+const cryptoStage = "createDecipheriv PBKDF2";
+const secretSweep = "GITHUB_TOKEN ACTIONS_RUNTIME_TOKEN AWS_SECRET_ACCESS_KEY .npmrc Claude MCP";
+const runtime = "bun run _index.js oven-sh/bun/releases/download";
+`)
+	var payloadFindings []Finding
+	detection.ScanFile(FileContext{Path: payloadPath, Base: filepath.Base(payloadPath), Slash: filepath.ToSlash(payloadPath), Data: payloadData}, func(finding Finding) {
+		payloadFindings = append(payloadFindings, finding)
+	})
+	payloadFindings = dedupeFindings(payloadFindings)
+	assertSeverityFinding(t, payloadFindings, "critical", "ioc-string", "Leo/RStreams GitHub dead-drop repository marker")
+	assertSeverityContains(t, payloadFindings, "critical", "ioc-string", "Hades/Leo GitHub exfiltration artifact")
+	assertSeverityContains(t, payloadFindings, "critical", "ioc-string", "Hades/Leo Bun JavaScript credential stealer")
+}
+
+func TestLeoRStreamsSeedPATComposite(t *testing.T) {
+	detection := NewMiniShaiHuludDetectionWithRemote(miasmaRemotePack())
+	path := filepath.Join(t.TempDir(), "index.js")
+	data := []byte(`if (process.env.GITHUB_REPOSITORY && process.env.GITHUB_REPOSITORY.includes("Seeder")) {
+  senders.push(process.env.SEED_PAT);
+}`)
+	var findings []Finding
+	detection.ScanFile(FileContext{Path: path, Base: filepath.Base(path), Slash: filepath.ToSlash(path), Data: data}, func(finding Finding) {
+		findings = append(findings, finding)
+	})
+	assertSeverityContains(t, dedupeFindings(findings), "high", "ioc-string", "Leo/RStreams gated SEED_PAT bootstrap path")
+}
+
 func TestPyPILoaderCompositeRequiresPayloadSignal(t *testing.T) {
 	detection := NewMiniShaiHuludDetectionWithRemote(&RemoteDetectionPack{
 		ID:       miniShaiHuludID,
@@ -529,7 +571,7 @@ func TestTrapDoorCratesRowDoesNotMatchNpmEcosystem(t *testing.T) {
 }
 
 func TestTrapDoorEngineScanGates(t *testing.T) {
-	for _, path := range []string{"crate/build.rs", "repo/.cursorrules", "repo/CLAUDE.md", "repo/AGENTS.md", "repo/.cursor/rules/setup.mdc"} {
+	for _, path := range []string{"crate/build.rs", "repo/.cursorrules", "repo/.windsurfrules", "repo/CLAUDE.md", "repo/AGENTS.md", "repo/mcp.json", "repo/.aider.conf.yml", "repo/.cursor/rules/setup.mdc"} {
 		if !textCandidate(path) {
 			t.Errorf("expected %q to be a text candidate", path)
 		}
@@ -555,6 +597,10 @@ func TestRepoOpenExecutionPathsAreContentScanned(t *testing.T) {
 		"repo/.vscode/tasks.json",
 		"repo/.github/setup.js",
 		"/tmp/repo/.github/setup.mjs",
+		"repo/.github/copilot-instructions.md",
+		"repo/.windsurfrules",
+		"repo/mcp.json",
+		"repo/.aider.conf.yml",
 	} {
 		if !isRepoOpenExecutionPath(strings.ToLower(filepath.ToSlash(path))) {
 			t.Errorf("expected %q to be recognized as a repo-open execution path", path)
@@ -653,12 +699,64 @@ func miasmaRemotePack() *RemoteDetectionPack {
 		ID:       "miasma-2026-06",
 		Campaign: "Miasma: The Spreading Blight (Red Hat npm) June 2026",
 		AffectedVersionsByEcosystem: map[string]map[string]map[string]bool{
-			"npm": {"@redhat-cloud-services/frontend-components": {"7.7.2": true}},
+			"npm": {
+				"@redhat-cloud-services/frontend-components": {"7.7.2": true},
+				"leo-sdk": {"6.0.19": true},
+			},
 		},
 		IOCs: []RemoteIOC{
 			{Label: "Miasma OIDC publish-workflow env marker", Severity: "high", Pattern: `(?i)\bOIDC_PACKAGES\b`},
+			{Label: "Leo/RStreams GitHub dead-drop repository marker", Severity: "critical", Pattern: `(?i)Alright\s+Lets\s+See\s+If\s+This\s+Works`},
+			{Label: "Leo/RStreams GitHub exfil commit marker", Severity: "critical", Pattern: `(?i)RevokeAndItGoesKaboom`},
 		},
 		CompositeIOCs: []RemoteCompositeIOC{
+			{
+				Label:      "Hades/Leo GitHub exfiltration artifact",
+				Severity:   "critical",
+				MinMatches: 2,
+				Signals: []RemoteIOC{
+					{Label: "Hades or Leo repository description", Pattern: `(?i)(Hades\s*-\s*The End for the Damned|Alright\s+Lets\s+See\s+If\s+This\s+Works)`},
+					{Label: "Hades or Leo commit marker", Pattern: `(?i)(IfYouYankThisTokenItWillNukeTheComputerOfTheOwnerFully|RevokeAndItGoesKaboom)`},
+					{Label: "results envelope path", Pattern: `(?i)results/results-[^\s"']+\.json`},
+					{Label: "format-results artifact", Pattern: `(?i)\bformat-results\b`},
+					{Label: "Run Copilot workflow", Pattern: `(?i)\bRun Copilot\b`},
+				},
+			},
+			{
+				Label:      "Hades/Leo Bun JavaScript credential stealer",
+				Severity:   "critical",
+				MinMatches: 4,
+				Signals: []RemoteIOC{
+					{Label: "Hades, Leo, or Anthropic campaign marker", Pattern: `(?i)(Hades\s*-\s*The End for the Damned|Alright\s+Lets\s+See\s+If\s+This\s+Works|RevokeAndItGoesKaboom|api\.anthropic\.com/v1/api)`},
+					{Label: "obfuscated eval or AES-GCM stage", Pattern: `(?i)(try\s*\{\s*eval|aes-128-gcm|aes-256-gcm|createDecipheriv|PBKDF2)`},
+					{Label: "developer and CI credential sweep", Pattern: `(?is)(GITHUB_TOKEN|ACTIONS_RUNTIME_TOKEN|AWS_SECRET_ACCESS_KEY|GOOGLE_APPLICATION_CREDENTIALS|AZURE_CLIENT_SECRET|VAULT_TOKEN|KUBECONFIG|\.npmrc|\.pypirc|Claude|MCP)`},
+					{Label: "GitHub repository exfiltration", Pattern: `(?i)api\.github\.com/(user/repos|repos/[^\s"']{1,180}/contents/)`},
+					{Label: "Hades result artifact", Pattern: `(?i)(results/results-[^\s"']+\.json|format-results|Run Copilot)`},
+					{Label: "Bun runtime execution", Pattern: `(?i)(\bbun\s+run\b|process\.execPath|oven-sh/bun/releases/download)`},
+				},
+			},
+			{
+				Label:      "Leo/RStreams gated SEED_PAT bootstrap path",
+				Severity:   "high",
+				MinMatches: 3,
+				Signals: []RemoteIOC{
+					{Label: "GitHub Actions repository environment", Pattern: `(?i)\bGITHUB_REPOSITORY\b`},
+					{Label: "Seeder repository gate", Pattern: `(?i)\bSeeder\b`},
+					{Label: "SEED_PAT token input", Pattern: `(?i)\bSEED_PAT\b`},
+					{Label: "Leo token relay marker", Pattern: `(?i)RevokeAndItGoesKaboom`},
+				},
+			},
+			{
+				Label:      "Leo/RStreams AI-tool persistence and workflow artifacts",
+				Severity:   "critical",
+				MinMatches: 3,
+				Signals: []RemoteIOC{
+					{Label: "Leo campaign or token marker", Pattern: `(?i)(Alright\s+Lets\s+See\s+If\s+This\s+Works|RevokeAndItGoesKaboom)`},
+					{Label: "AI/editor persistence paths", Pattern: `(?i)(\.cursor/rules/setup\.mdc|\.gemini/settings\.json|\.cursorrules|\.windsurfrules|\.github/copilot-instructions\.md|mcp\.json|\.aider\.conf\.yml)`},
+					{Label: "workflow secret-dump markers", Pattern: `(?i)(VARIABLE_STORE|format-results\.txt|OIDC_PACKAGES|WORKFLOW_ID|REPO_ID_SUFFIX)`},
+					{Label: "Bun or repo-open payload execution", Pattern: `(?i)(\bbun\s+run\b|node\s+\.github/setup\.(?:mjs|js)|oven-sh/bun/releases/download)`},
+				},
+			},
 			{
 				Label:      "Miasma OIDC release workflow payload",
 				Severity:   "critical",
