@@ -26,7 +26,6 @@ func parsePackageCSVWithEcosystems(raw string) parsedPackageCSV {
 	if err != nil {
 		return out
 	}
-	versionRE := regexp.MustCompile(`\d+(?:\.\d+)+(?:[-+][0-9A-Za-z.-]+)?`)
 	layout := packageCSVColumnLayout{ecosystemIndex: -1, packageIndex: 0, versionIndex: 1}
 	start := 0
 	if len(records) > 0 {
@@ -51,7 +50,7 @@ func parsePackageCSVWithEcosystems(raw string) parsedPackageCSV {
 		if layout.ecosystemIndex >= 0 && layout.ecosystemIndex < len(record) {
 			ecosystem = normalizePackageEcosystem(record[layout.ecosystemIndex])
 		}
-		for _, version := range versionRE.FindAllString(record[layout.versionIndex], -1) {
+		for _, version := range parseAffectedVersionField(record[layout.versionIndex]) {
 			if ecosystem == "" {
 				addAffectedVersion(out.Versions, pkg, version)
 				continue
@@ -63,6 +62,30 @@ func parsePackageCSVWithEcosystems(raw string) parsedPackageCSV {
 		}
 	}
 	return out
+}
+
+func parseAffectedVersionField(field string) []string {
+	exactVersionRE := regexp.MustCompile(`(?:^|[|,])\s*=\s*([^\s,|]+)`)
+	numberedVersionRE := regexp.MustCompile(`\bv?\d+(?:\.\d+)+(?:[-+][0-9A-Za-z.-]+)?`)
+	seen := map[string]bool{}
+	versions := []string{}
+	add := func(version string) {
+		version = strings.Trim(strings.TrimSpace(version), `"'`)
+		if version == "" || seen[version] {
+			return
+		}
+		seen[version] = true
+		versions = append(versions, version)
+	}
+	for _, match := range exactVersionRE.FindAllStringSubmatch(field, -1) {
+		if len(match) > 1 {
+			add(match[1])
+		}
+	}
+	for _, version := range numberedVersionRE.FindAllString(field, -1) {
+		add(version)
+	}
+	return versions
 }
 
 type packageCSVColumnLayout struct {
@@ -120,6 +143,8 @@ func normalizePackageEcosystem(value string) string {
 		return "composer"
 	case "crates", "crates.io", "cargo", "rust":
 		return "crates"
+	case "go", "golang", "gomod", "go modules", "go-modules":
+		return "go"
 	default:
 		return strings.ToLower(strings.TrimSpace(value))
 	}

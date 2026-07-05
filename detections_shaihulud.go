@@ -144,7 +144,7 @@ func (d *MiniShaiHuludDetection) ScanFile(file FileContext, emit EmitFinding) {
 		d.scanPackageJSON(file, emit)
 	case "package-lock.json":
 		d.scanPackageLock(file, emit)
-	case "pnpm-lock.yaml", "yarn.lock", "poetry.lock", "pyproject.toml", "npm-shrinkwrap.json", "pipfile.lock", "uv.lock", "pdm.lock", "composer.json", "composer.lock", "cargo.toml", "cargo.lock":
+	case "pnpm-lock.yaml", "yarn.lock", "poetry.lock", "pyproject.toml", "npm-shrinkwrap.json", "pipfile.lock", "uv.lock", "pdm.lock", "composer.json", "composer.lock", "go.mod", "cargo.toml", "cargo.lock":
 		d.scanTextManifest(file, emit)
 	case "metadata":
 		d.scanPythonMetadata(file, emit)
@@ -309,6 +309,7 @@ func (d *MiniShaiHuludDetection) scanTextManifest(file FileContext, emit EmitFin
 			quotedVersion := regexp.QuoteMeta(version)
 			patterns := []*regexp.Regexp{
 				regexp.MustCompile(`(?m)(^|["'\s/@])` + quotedPkg + `@` + quotedVersion + `([:",\s()_]|$)`),
+				regexp.MustCompile(`(?m)^\s*(?:require\s+)?` + quotedPkg + `\s+` + quotedVersion + `(?:\s|$)`),
 				regexp.MustCompile(`(?m)["']?` + quotedPkg + `["']?\s*[:=]\s*["']?[\^~]?` + quotedVersion + `["']?`),
 				regexp.MustCompile(`(?ms)` + quotedPkg + `@[^:\n]+:\s*.{0,300}version:\s*["']?` + quotedVersion + `["']?`),
 				regexp.MustCompile(`(?ms)name\s*=\s*["']` + quotedPkg + `["'].{0,250}version\s*=\s*["']` + quotedVersion + `["']`),
@@ -829,6 +830,8 @@ func manifestEcosystem(file FileContext) string {
 		return "pypi"
 	case "composer.json", "composer.lock":
 		return "composer"
+	case "go.mod":
+		return "go"
 	case "cargo.toml", "cargo.lock":
 		return "crates"
 	default:

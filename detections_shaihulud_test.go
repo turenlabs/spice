@@ -390,6 +390,8 @@ func TestPackageCSVParsing(t *testing.T) {
 	parsed := parsePackageCSV(`Package,Version
 @scope/quoted,"= 1.2.3, = 1.2.4"
 plain-package,>= 0.9.0 <= 0.9.2
+branch-package,= dev-main
+go-module,= v0.0.0-20260503100027-79bdb26ca95d
 ,= 9.9.9
 missing-version
 `)
@@ -402,6 +404,8 @@ missing-version
 		{"@scope/quoted", "1.2.4"},
 		{"plain-package", "0.9.0"},
 		{"plain-package", "0.9.2"},
+		{"branch-package", "dev-main"},
+		{"go-module", "v0.0.0-20260503100027-79bdb26ca95d"},
 	} {
 		if !parsed[test.pkg][test.version] {
 			t.Fatalf("parsePackageCSV() missing %s@%s from %#v", test.pkg, test.version, parsed[test.pkg])
@@ -418,6 +422,8 @@ func TestPackageCSVParsingWithEcosystems(t *testing.T) {
 @scope/quoted,"= 1.2.3, = 1.2.4",npm
 mistralai,= 2.4.6,pypi
 intercom/intercom-php,= 5.0.2,packagist
+github.com/Xpos587/git2md,= v0.0.0-20260503100027-79bdb26ca95d,golang
+sevenspan/laravel-chat,= dev-main,composer
 `)
 
 	if parsed.Versions["@scope/quoted"]["1.2.3"] {
@@ -431,6 +437,12 @@ intercom/intercom-php,= 5.0.2,packagist
 	}
 	if !parsed.EcosystemVersions["composer"]["intercom/intercom-php"]["5.0.2"] {
 		t.Fatal("missing normalized composer package version")
+	}
+	if !parsed.EcosystemVersions["go"]["github.com/Xpos587/git2md"]["v0.0.0-20260503100027-79bdb26ca95d"] {
+		t.Fatal("missing normalized Go module pseudo-version")
+	}
+	if !parsed.EcosystemVersions["composer"]["sevenspan/laravel-chat"]["dev-main"] {
+		t.Fatal("missing composer dev branch version")
 	}
 }
 
@@ -468,6 +480,32 @@ func TestRemotePackIdentityIsPreserved(t *testing.T) {
 	}
 	if findings[0].DetectionID != "node-ipc-2026-05" || findings[0].Campaign != "node-ipc npm compromise May 2026" {
 		t.Fatalf("remote pack identity was not preserved: %#v", findings[0])
+	}
+}
+
+func TestGoModAffectedPackageDetection(t *testing.T) {
+	detection := NewMiniShaiHuludDetectionWithRemote(&RemoteDetectionPack{
+		ID:       "polinrider-2026-07",
+		Campaign: "PolinRider July 2026",
+		AffectedVersionsByEcosystem: map[string]map[string]map[string]bool{
+			"go": {
+				"github.com/Xpos587/git2md": {
+					"v0.0.0-20260503100027-79bdb26ca95d": true,
+				},
+			},
+		},
+	})
+	path := filepath.Join(t.TempDir(), "go.mod")
+	data := []byte("module example.test/app\n\nrequire github.com/Xpos587/git2md v0.0.0-20260503100027-79bdb26ca95d\n")
+	var findings []Finding
+	detection.ScanFile(FileContext{Path: path, Base: filepath.Base(path), Slash: filepath.ToSlash(path), Data: data}, func(finding Finding) {
+		findings = append(findings, finding)
+	})
+	if len(findings) != 1 {
+		t.Fatalf("expected one Go affected-package finding, got %#v", findings)
+	}
+	if findings[0].Kind != "affected-package" {
+		t.Fatalf("expected affected-package finding, got %#v", findings[0])
 	}
 }
 
