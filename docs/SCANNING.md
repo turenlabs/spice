@@ -35,8 +35,8 @@ Candidate selection lives in `engine.go`.
 
 Always scan:
 
-- package manifests and lockfiles (npm, PyPI, Composer, Go, and Cargo `Cargo.toml`/`Cargo.lock`)
-- package archives
+- package manifests and lockfiles (npm, PyPI, Composer, Go, Cargo `Cargo.toml`/`Cargo.lock`, and NuGet project/props/config/lock/assets/nuspec files)
+- package archives, including NuGet `.nupkg` ZIP archives
 - Python `METADATA`
 - Dockerfiles
 - crates build scripts (`build.rs`)

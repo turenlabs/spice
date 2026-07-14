@@ -100,6 +100,7 @@ export function devSeverityBucket(severity: string): 'critical' | 'review' | 'wo
 }
 
 export function devFindingLabel(finding: Finding) {
+  if (finding.kind === 'affected-package-constraint') return 'Potential exposure';
   if (finding.confidence === 'reference') return 'Reference/test context';
   if (finding.confidence === 'confirmed') return 'Confirmed indicator';
   if (finding.confidence === 'likely') return 'High-confidence evidence';
@@ -126,6 +127,8 @@ export function devKind(kind: string) {
   switch (kind) {
     case 'affected-package':
       return 'package version';
+    case 'affected-package-constraint':
+      return 'package constraint';
     case 'known-malware-hash':
       return 'matched file hash';
     case 'campaign-artifact':
@@ -148,6 +151,8 @@ export function devReason(finding: Finding) {
   switch (finding.kind) {
     case 'affected-package':
       return 'Exposure evidence: this dependency version appears in a loaded incident pack.';
+    case 'affected-package-constraint':
+      return 'Potential exposure: this dependency constraint can resolve to a version in a loaded incident pack. Confirm the installed or resolved version.';
     case 'known-malware-hash':
       return 'Strong evidence: this file exactly matches a hash from a loaded incident pack.';
     case 'campaign-artifact':
