@@ -186,6 +186,8 @@ func devCLIKind(kind string) string {
 	switch kind {
 	case "affected-package":
 		return "package version"
+	case "affected-package-constraint":
+		return "package constraint"
 	case "known-malware-hash":
 		return "matched bad file"
 	case "campaign-artifact":

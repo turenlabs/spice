@@ -8,12 +8,14 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 	"unicode"
@@ -51,7 +53,7 @@ type indexedFile struct {
 	LastScannedAt time.Time
 }
 
-const scanEngineVersion = "2026-07-05-cross-ecosystem-detections"
+const scanEngineVersion = "2026-07-14-nuget-detections"
 const inventoryFTSVersion = "2026-05-16-inventory-fts-v1"
 
 const createPackageInventoryFTS = `CREATE VIRTUAL TABLE IF NOT EXISTS package_inventory_fts USING fts5(
@@ -779,7 +781,10 @@ func ExtractPackages(path string) []PackageRef {
 }
 
 func ExtractPackagesFromBytes(path string, data []byte) []PackageRef {
-	base := filepath.Base(path)
+	base := packageManifestBase(path)
+	if isNuGetManifestBase(base) {
+		return extractNuGetPackages(path, data)
+	}
 	switch {
 	case base == "package.json":
 		return extractPackageJSONPackages(path, data)
@@ -808,6 +813,351 @@ func ExtractPackagesFromBytes(path string, data []byte) []PackageRef {
 	default:
 		return nil
 	}
+}
+
+const maxNuGetManifestBytes int64 = 16 * 1024 * 1024
+
+type nuGetXMLFrame struct {
+	name        string
+	packageName string
+	version     string
+	sourceKind  string
+	exact       bool
+	text        string
+}
+
+func extractNuGetPackages(path string, data []byte) []PackageRef {
+	records := extractNuGetPackageRecords(path, data)
+	packages := make([]PackageRef, 0, len(records))
+	for _, record := range records {
+		packages = append(packages, record.ref)
+	}
+	return packages
+}
+
+type nuGetPackageRecord struct {
+	ref   PackageRef
+	exact bool
+}
+
+func extractNuGetPackageRecords(path string, data []byte) []nuGetPackageRecord {
+	content, ok := readBoundedPackageData(path, data, maxNuGetManifestBytes)
+	if !ok {
+		return nil
+	}
+	lowerBase := strings.ToLower(packageManifestBase(path))
+	var records []nuGetPackageRecord
+	switch lowerBase {
+	case "packages.lock.json":
+		records = exactNuGetPackageRecords(extractNuGetLockPackages(path, content))
+	case "project.assets.json":
+		records = exactNuGetPackageRecords(extractNuGetAssetsPackages(path, content))
+	default:
+		records = extractNuGetXMLPackages(path, content)
+	}
+	return dedupeNuGetPackageRecords(records)
+}
+
+func exactNuGetPackageRecords(packages []PackageRef) []nuGetPackageRecord {
+	records := make([]nuGetPackageRecord, 0, len(packages))
+	for _, pkg := range packages {
+		records = append(records, nuGetPackageRecord{ref: pkg, exact: true})
+	}
+	return records
+}
+
+func readBoundedPackageData(path string, data []byte, maxBytes int64) ([]byte, bool) {
+	if data != nil {
+		if int64(len(data)) > maxBytes {
+			return nil, false
+		}
+		return data, true
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, false
+	}
+	defer file.Close()
+	content, err := io.ReadAll(io.LimitReader(file, maxBytes+1))
+	return content, err == nil && int64(len(content)) <= maxBytes
+}
+
+func extractNuGetXMLPackages(path string, content []byte) []nuGetPackageRecord {
+	decoder := xml.NewDecoder(bytes.NewReader(content))
+	lowerBase := strings.ToLower(packageManifestBase(path))
+	isProjectManifest := strings.HasSuffix(lowerBase, ".csproj") ||
+		strings.HasSuffix(lowerBase, ".fsproj") ||
+		strings.HasSuffix(lowerBase, ".vbproj") ||
+		strings.HasSuffix(lowerBase, ".props")
+	isPackagesConfig := lowerBase == "packages.config"
+	isNuspec := strings.HasSuffix(lowerBase, ".nuspec")
+	frames := []nuGetXMLFrame{}
+	records := []nuGetPackageRecord{}
+	add := func(name, version, sourceKind string, exact bool) {
+		name = strings.TrimSpace(name)
+		version = strings.TrimSpace(version)
+		if name == "" || version == "" || sourceKind == "" {
+			return
+		}
+		records = append(records, nuGetPackageRecord{
+			ref: PackageRef{
+				Ecosystem:  "nuget",
+				Name:       name,
+				Version:    version,
+				SourcePath: path,
+				SourceKind: sourceKind,
+			},
+			exact: exact,
+		})
+	}
+
+	for {
+		token, err := decoder.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil
+		}
+		switch value := token.(type) {
+		case xml.StartElement:
+			if len(frames) >= 256 {
+				return nil
+			}
+			frame := nuGetXMLFrame{name: strings.ToLower(value.Name.Local)}
+			switch frame.name {
+			case "packagereference", "packageversion", "globalpackagereference":
+				if isProjectManifest {
+					frame.packageName = nuGetXMLAttribute(value, "include", "update")
+					frame.version, frame.exact = nuGetDeclaredRangeVersion(nuGetXMLAttribute(value, "versionoverride", "version"))
+					frame.sourceKind = "nuget-project"
+				}
+			case "package":
+				if isPackagesConfig {
+					frame.packageName = nuGetXMLAttribute(value, "id")
+					frame.version = normalizeNuGetVersion(nuGetXMLAttribute(value, "version"))
+					frame.sourceKind = "packages.config"
+					frame.exact = true
+				}
+			case "dependency":
+				if isNuspec {
+					frame.packageName = nuGetXMLAttribute(value, "id")
+					frame.version, frame.exact = nuGetDeclaredRangeVersion(nuGetXMLAttribute(value, "version"))
+					frame.sourceKind = "nuspec"
+				}
+			case "metadata":
+				if isNuspec {
+					frame.sourceKind = "nuspec"
+					frame.exact = true
+				}
+			}
+			frames = append(frames, frame)
+		case xml.CharData:
+			if len(frames) == 0 {
+				continue
+			}
+			frame := &frames[len(frames)-1]
+			if len(frame.text) < 4096 {
+				remaining := 4096 - len(frame.text)
+				chunk := string(value)
+				if len(chunk) > remaining {
+					chunk = chunk[:remaining]
+				}
+				frame.text += chunk
+			}
+		case xml.EndElement:
+			if len(frames) == 0 {
+				continue
+			}
+			frame := frames[len(frames)-1]
+			frames = frames[:len(frames)-1]
+			textValue := strings.TrimSpace(frame.text)
+			if len(frames) > 0 {
+				parent := &frames[len(frames)-1]
+				switch {
+				case (frame.name == "version" || frame.name == "versionoverride") && (parent.name == "packagereference" || parent.name == "packageversion" || parent.name == "globalpackagereference"):
+					parent.version, parent.exact = nuGetDeclaredRangeVersion(textValue)
+				case frame.name == "id" && parent.name == "metadata":
+					parent.packageName = textValue
+				case frame.name == "version" && parent.name == "metadata":
+					parent.version = normalizeNuGetVersion(textValue)
+				}
+			}
+			switch frame.name {
+			case "packagereference", "packageversion", "globalpackagereference", "package", "dependency", "metadata":
+				add(frame.packageName, frame.version, frame.sourceKind, frame.exact)
+			}
+		}
+	}
+	return records
+}
+
+func nuGetXMLAttribute(element xml.StartElement, names ...string) string {
+	for _, name := range names {
+		for _, attribute := range element.Attr {
+			if strings.EqualFold(attribute.Name.Local, name) {
+				return strings.TrimSpace(attribute.Value)
+			}
+		}
+	}
+	return ""
+}
+
+func extractNuGetLockPackages(path string, content []byte) []PackageRef {
+	var document any
+	if err := json.Unmarshal(content, &document); err != nil {
+		return nil
+	}
+	packages := []PackageRef{}
+	var walk func(any, int)
+	walk = func(value any, depth int) {
+		if depth > 32 {
+			return
+		}
+		object, ok := value.(map[string]any)
+		if !ok {
+			return
+		}
+		keys := make([]string, 0, len(object))
+		for key := range object {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			child := object[key]
+			if metadata, ok := child.(map[string]any); ok {
+				if version, ok := metadata["resolved"].(string); ok {
+					packages = append(packages, PackageRef{
+						Ecosystem:  "nuget",
+						Name:       key,
+						Version:    normalizeNuGetVersion(version),
+						SourcePath: path,
+						SourceKind: "packages.lock.json",
+					})
+				}
+				walk(metadata, depth+1)
+			}
+		}
+	}
+	walk(document, 0)
+	return packages
+}
+
+func extractNuGetAssetsPackages(path string, content []byte) []PackageRef {
+	var document map[string]any
+	if err := json.Unmarshal(content, &document); err != nil {
+		return nil
+	}
+	libraries, ok := document["libraries"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	keys := make([]string, 0, len(libraries))
+	for key := range libraries {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	packages := []PackageRef{}
+	for _, identity := range keys {
+		metadata, ok := libraries[identity].(map[string]any)
+		if !ok {
+			continue
+		}
+		if packageType, ok := metadata["type"].(string); ok && !strings.EqualFold(packageType, "package") {
+			continue
+		}
+		separator := strings.LastIndex(identity, "/")
+		if separator <= 0 || separator == len(identity)-1 {
+			continue
+		}
+		packages = append(packages, PackageRef{
+			Ecosystem:  "nuget",
+			Name:       identity[:separator],
+			Version:    normalizeNuGetVersion(identity[separator+1:]),
+			SourcePath: path,
+			SourceKind: "project.assets.json",
+		})
+	}
+	return packages
+}
+
+func normalizeNuGetVersion(version string) string {
+	version = strings.TrimSpace(version)
+	if len(version) > 2 && strings.HasPrefix(version, "[") && strings.HasSuffix(version, "]") && !strings.Contains(version, ",") {
+		return strings.TrimSpace(version[1 : len(version)-1])
+	}
+	return version
+}
+
+func exactNuGetRangeVersion(version string) (string, bool) {
+	version = strings.TrimSpace(version)
+	if len(version) <= 2 || !strings.HasPrefix(version, "[") || !strings.HasSuffix(version, "]") || strings.Contains(version, ",") {
+		return "", false
+	}
+	exact := strings.TrimSpace(version[1 : len(version)-1])
+	if !isNuGetVersionLiteral(exact) {
+		return "", false
+	}
+	return exact, true
+}
+
+func nuGetDeclaredRangeVersion(version string) (string, bool) {
+	if exact, ok := exactNuGetRangeVersion(version); ok {
+		return exact, true
+	}
+	return strings.TrimSpace(version), false
+}
+
+func nuGetConstraintMinimum(version string) (string, bool) {
+	version = strings.TrimSpace(version)
+	if version == "" || strings.HasPrefix(version, "(") {
+		return "", false
+	}
+	if strings.HasPrefix(version, "[") {
+		comma := strings.Index(version, ",")
+		if comma <= 1 || (!strings.HasSuffix(version, ")") && !strings.HasSuffix(version, "]")) {
+			return "", false
+		}
+		minimum := strings.TrimSpace(version[1:comma])
+		return minimum, isNuGetVersionLiteral(minimum)
+	}
+	return version, isNuGetVersionLiteral(version)
+}
+
+func isNuGetVersionLiteral(version string) bool {
+	return version != "" && !strings.ContainsAny(version, "[]()$*<>,=|& \t\r\n")
+}
+
+func dedupeNuGetPackageRecords(records []nuGetPackageRecord) []nuGetPackageRecord {
+	seen := map[string]int{}
+	deduped := make([]nuGetPackageRecord, 0, len(records))
+	for _, record := range records {
+		pkg := record.ref
+		if pkg.Name == "" || pkg.Version == "" {
+			continue
+		}
+		key := strings.ToLower(pkg.Name) + "\x00" + pkg.Version + "\x00" + pkg.SourceKind
+		if index, ok := seen[key]; ok {
+			if record.exact {
+				deduped[index].exact = true
+			}
+			continue
+		}
+		seen[key] = len(deduped)
+		deduped = append(deduped, record)
+	}
+	sort.Slice(deduped, func(i, j int) bool {
+		left := strings.ToLower(deduped[i].ref.Name)
+		right := strings.ToLower(deduped[j].ref.Name)
+		if left != right {
+			return left < right
+		}
+		if deduped[i].ref.Version != deduped[j].ref.Version {
+			return deduped[i].ref.Version < deduped[j].ref.Version
+		}
+		return deduped[i].ref.SourceKind < deduped[j].ref.SourceKind
+	})
+	return deduped
 }
 
 func extractPackageLockPackages(path string, dataBytes []byte) []PackageRef {

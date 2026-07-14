@@ -27,6 +27,7 @@ Remote detections are cached in:
 `package_inventory`
 
 - package references extracted from manifests, lockfiles, archives, and metadata
+- NuGet inventory includes package references from project/props XML, `packages.config`, `packages.lock.json`, `project.assets.json`, and `.nuspec` metadata; declared minimums and ranges remain visible even when they are not exact resolved versions
 - deduped in queries by package identity and source digest/path
 
 `scan_runs`
@@ -86,4 +87,3 @@ Tests that need table-specific helpers should use explicit switch allowlists for
 - Wails methods open storage independently. A future `StorageService` should open/migrate once at app startup and own context-aware methods.
 - PRAGMAs are set during migration; if connection pooling remains, ensure connection-scoped settings are applied consistently.
 - Inventory queries still perform dedup grouping at read time. A generated or persisted source key may improve large inventories.
-

@@ -76,14 +76,26 @@ version:
 
 release-check:
 	@test -n "$(VERSION)" || { printf "VERSION is empty. Set VERSION or add a VERSION file.\n" >&2; exit 1; }
-	@wails_version="$$(sed -n 's/.*"productVersion": "\([^"]*\)".*/\1/p' wails.json | head -n1)"; \
-	if [[ -n "$$wails_version" && "$$wails_version" != "$(VERSION)" ]]; then \
-		printf "VERSION (%s) does not match wails.json productVersion (%s).\n" "$(VERSION)" "$$wails_version" >&2; \
-		exit 1; \
-	fi
 	@command -v go >/dev/null || { printf "go is required.\n" >&2; exit 1; }
 	@command -v npm >/dev/null || { printf "npm is required for frontend assets.\n" >&2; exit 1; }
+	@command -v node >/dev/null || { printf "node is required for release metadata validation.\n" >&2; exit 1; }
 	@command -v shasum >/dev/null || { printf "shasum is required for checksums.\n" >&2; exit 1; }
+	@wails_version="$$(sed -n 's/.*"productVersion": "\([^"]*\)".*/\1/p' wails.json | head -n1)"; \
+	frontend_version="$$(node -p 'require("./frontend/package.json").version')"; \
+	lock_version="$$(node -p 'require("./frontend/package-lock.json").version')"; \
+	lock_package_version="$$(node -p 'require("./frontend/package-lock.json").packages[""].version')"; \
+	for metadata in \
+		"wails.json productVersion:$$wails_version" \
+		"frontend/package.json version:$$frontend_version" \
+		"frontend/package-lock.json version:$$lock_version" \
+		"frontend/package-lock.json packages root version:$$lock_package_version"; do \
+		label="$${metadata%%:*}"; \
+		value="$${metadata#*:}"; \
+		if [[ "$$value" != "$(VERSION)" ]]; then \
+			printf "VERSION (%s) does not match %s (%s).\n" "$(VERSION)" "$$label" "$$value" >&2; \
+			exit 1; \
+		fi; \
+	done
 	@printf "Release metadata OK: $(APP_NAME) $(VERSION) ($(COMMIT))\n"
 
 release: test release-artifacts checksums

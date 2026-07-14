@@ -139,14 +139,16 @@ func (d *MiniShaiHuludDetection) ScanGlobal(emit EmitFinding) {
 
 func (d *MiniShaiHuludDetection) ScanFile(file FileContext, emit EmitFinding) {
 	base := strings.ToLower(file.Base)
-	switch base {
-	case "package.json":
+	switch {
+	case isNuGetManifestBase(base):
+		d.scanNuGetManifest(file, emit)
+	case base == "package.json":
 		d.scanPackageJSON(file, emit)
-	case "package-lock.json":
+	case base == "package-lock.json":
 		d.scanPackageLock(file, emit)
-	case "pnpm-lock.yaml", "yarn.lock", "poetry.lock", "pyproject.toml", "npm-shrinkwrap.json", "pipfile.lock", "uv.lock", "pdm.lock", "composer.json", "composer.lock", "go.mod", "cargo.toml", "cargo.lock":
+	case base == "pnpm-lock.yaml", base == "yarn.lock", base == "poetry.lock", base == "pyproject.toml", base == "npm-shrinkwrap.json", base == "pipfile.lock", base == "uv.lock", base == "pdm.lock", base == "composer.json", base == "composer.lock", base == "go.mod", base == "cargo.toml", base == "cargo.lock":
 		d.scanTextManifest(file, emit)
-	case "metadata":
+	case base == "metadata":
 		d.scanPythonMetadata(file, emit)
 	default:
 		if strings.HasPrefix(base, "requirements") && strings.HasSuffix(base, ".txt") {
@@ -297,6 +299,44 @@ func (d *MiniShaiHuludDetection) scanPythonMetadata(file FileContext, emit EmitF
 	}
 }
 
+func (d *MiniShaiHuludDetection) scanNuGetManifest(file FileContext, emit EmitFinding) {
+	if !d.hasAffectedPackageRows("nuget") {
+		return
+	}
+	for _, record := range extractNuGetPackageRecords(file.Path, file.Data) {
+		pkg := record.ref
+		if record.exact {
+			if d.isAffected("nuget", pkg.Name, pkg.Version) {
+				d.addAffected(emit, file.Path, pkg.Name, pkg.Version, pkg.SourceKind)
+			}
+			continue
+		}
+		minimum, ok := nuGetConstraintMinimum(pkg.Version)
+		if ok && d.isAffected("nuget", pkg.Name, minimum) {
+			d.emit(
+				emit,
+				"high",
+				"affected-package-constraint",
+				file.Path,
+				fmt.Sprintf("%s constraint %q can resolve known affected version %s in %s; installed version is not established", pkg.Name, pkg.Version, minimum, pkg.SourceKind),
+				"Inspect packages.lock.json, project.assets.json, or restore output for the resolved version. Move the constraint above the affected version and restore from a known-good registry state if exposure is confirmed.",
+			)
+		}
+	}
+}
+
+func (d *MiniShaiHuludDetection) hasAffectedPackageRows(ecosystem string) bool {
+	if len(d.affected) > 0 {
+		return true
+	}
+	for _, alias := range ecosystemAliases(ecosystem) {
+		if len(d.affectedByEcosystem[alias]) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func (d *MiniShaiHuludDetection) scanTextManifest(file FileContext, emit EmitFinding) {
 	data, ok := file.ReadAll(16 * 1024 * 1024)
 	if !ok {
@@ -332,6 +372,20 @@ func (d *MiniShaiHuludDetection) isAffected(ecosystem, pkg, version string) bool
 	for _, alias := range ecosystemAliases(ecosystem) {
 		if d.affectedByEcosystem[alias][pkg][version] {
 			return true
+		}
+	}
+	if normalizePackageEcosystem(ecosystem) == "nuget" {
+		for candidate, versions := range d.affected {
+			if strings.EqualFold(candidate, pkg) && versions[version] {
+				return true
+			}
+		}
+		for _, alias := range ecosystemAliases(ecosystem) {
+			for candidate, versions := range d.affectedByEcosystem[alias] {
+				if strings.EqualFold(candidate, pkg) && versions[version] {
+					return true
+				}
+			}
 		}
 	}
 	return false
@@ -442,7 +496,7 @@ func (d *MiniShaiHuludDetection) scanArchive(file FileContext, emit EmitFinding)
 		return
 	}
 	switch {
-	case strings.HasSuffix(base, ".zip"), strings.HasSuffix(base, ".whl"), strings.HasSuffix(base, ".pyz"):
+	case strings.HasSuffix(base, ".zip"), strings.HasSuffix(base, ".whl"), strings.HasSuffix(base, ".pyz"), strings.HasSuffix(base, ".nupkg"):
 		d.scanZipArchive(file, emit)
 	case strings.HasSuffix(base, ".tgz"), strings.HasSuffix(base, ".tar.gz"):
 		d.scanTarGzArchive(file, emit)
@@ -599,15 +653,17 @@ func (d *MiniShaiHuludDetection) scanArchiveMember(archivePath, memberName strin
 	if d.suspiciousFilename[strings.ToLower(base)] {
 		d.emit(emit, "high", "archive-artifact", virtualPath, fmt.Sprintf("suspicious package archive member: %s", memberName), "Treat this archive as hostile if it came from a package registry or install cache. Remove the package and rotate credentials if it may have run.")
 	}
-	switch strings.ToLower(base) {
-	case "package.json":
+	lowerBase := strings.ToLower(base)
+	switch {
+	case isNuGetManifestBase(lowerBase):
+		d.scanNuGetManifest(member, emit)
+	case lowerBase == "package.json":
 		d.scanPackageJSON(member, emit)
-	case "metadata":
+	case lowerBase == "metadata":
 		d.scanPythonMetadata(member, emit)
-	case "composer.json", "composer.lock", "package-lock.json", "npm-shrinkwrap.json", "pnpm-lock.yaml", "yarn.lock", "poetry.lock", "pyproject.toml", "pipfile.lock", "uv.lock", "pdm.lock", "cargo.toml", "cargo.lock":
+	case lowerBase == "composer.json", lowerBase == "composer.lock", lowerBase == "package-lock.json", lowerBase == "npm-shrinkwrap.json", lowerBase == "pnpm-lock.yaml", lowerBase == "yarn.lock", lowerBase == "poetry.lock", lowerBase == "pyproject.toml", lowerBase == "pipfile.lock", lowerBase == "uv.lock", lowerBase == "pdm.lock", lowerBase == "cargo.toml", lowerBase == "cargo.lock":
 		d.scanTextManifest(member, emit)
 	default:
-		lowerBase := strings.ToLower(base)
 		if strings.HasPrefix(lowerBase, "requirements") && strings.HasSuffix(lowerBase, ".txt") {
 			d.scanRequirements(member, emit)
 		}
@@ -834,7 +890,12 @@ func manifestEcosystem(file FileContext) string {
 		return "go"
 	case "cargo.toml", "cargo.lock":
 		return "crates"
+	case "packages.config", "packages.lock.json", "project.assets.json", "directory.packages.props":
+		return "nuget"
 	default:
+		if isNuGetManifestBase(base) {
+			return "nuget"
+		}
 		if strings.HasPrefix(base, "requirements") && strings.HasSuffix(base, ".txt") {
 			return "pypi"
 		}
@@ -866,7 +927,8 @@ func (d *MiniShaiHuludDetection) hashCandidate(base string) bool {
 		strings.HasSuffix(base, ".tar.gz") ||
 		strings.HasSuffix(base, ".zip") ||
 		strings.HasSuffix(base, ".whl") ||
-		strings.HasSuffix(base, ".pyz")
+		strings.HasSuffix(base, ".pyz") ||
+		strings.HasSuffix(base, ".nupkg")
 }
 
 func (d *MiniShaiHuludDetection) classifyInstallHook(hook string, command string) (string, string, bool) {

@@ -510,6 +510,9 @@ func shouldScanPackageArchive(size int64) bool {
 }
 
 func isAlwaysScanBase(base string) bool {
+	if isNuGetManifestBase(base) {
+		return true
+	}
 	switch {
 	case base == "package.json", base == "package-lock.json", base == "npm-shrinkwrap.json":
 		return true
@@ -540,7 +543,29 @@ func isPackageArchiveBase(base string) bool {
 		strings.HasSuffix(base, ".tar.gz") ||
 		strings.HasSuffix(base, ".zip") ||
 		strings.HasSuffix(base, ".whl") ||
-		strings.HasSuffix(base, ".pyz")
+		strings.HasSuffix(base, ".pyz") ||
+		strings.HasSuffix(base, ".nupkg")
+}
+
+func isNuGetManifestBase(base string) bool {
+	base = strings.ToLower(packageManifestBase(base))
+	switch base {
+	case "packages.config", "packages.lock.json", "project.assets.json", "directory.packages.props":
+		return true
+	default:
+		return strings.HasSuffix(base, ".csproj") ||
+			strings.HasSuffix(base, ".fsproj") ||
+			strings.HasSuffix(base, ".vbproj") ||
+			strings.HasSuffix(base, ".props") ||
+			strings.HasSuffix(base, ".nuspec")
+	}
+}
+
+func packageManifestBase(path string) string {
+	if separator := strings.LastIndex(path, "!"); separator >= 0 {
+		path = path[separator+1:]
+	}
+	return filepath.Base(path)
 }
 
 func isStartupOrTokenPath(slash string) bool {
@@ -567,7 +592,7 @@ func isStartupOrTokenPath(slash string) bool {
 func (s *Scanner) scanPriority(path string) int {
 	base := strings.ToLower(filepath.Base(path))
 	switch {
-	case base == "package.json", base == "package-lock.json", base == "pnpm-lock.yaml", base == "yarn.lock":
+	case base == "package.json", base == "package-lock.json", base == "pnpm-lock.yaml", base == "yarn.lock", isNuGetManifestBase(base):
 		return 0
 	case strings.HasPrefix(base, "requirements") && strings.HasSuffix(base, ".txt"):
 		return 1
@@ -727,6 +752,9 @@ func packageFromNodeModulesPath(location string) string {
 
 func textCandidate(path string) bool {
 	lower := strings.ToLower(path)
+	if isNuGetManifestBase(filepath.Base(lower)) {
+		return true
+	}
 	for _, suffix := range []string{".json", ".lock", ".yaml", ".yml", ".txt", ".log", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".py", ".rs", ".toml", ".ini", ".cfg", ".conf", ".plist", ".service", ".pth", ".gyp", ".md", ".mdc"} {
 		if strings.HasSuffix(lower, suffix) {
 			return true
@@ -811,7 +839,7 @@ func defaultFindingConfidence(finding Finding) string {
 		return "confirmed"
 	case "campaign-artifact":
 		return "likely"
-	case "affected-package":
+	case "affected-package", "affected-package-constraint":
 		return "exposure"
 	case "suspicious-install-hook":
 		return "possible"

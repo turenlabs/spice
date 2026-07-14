@@ -2,10 +2,12 @@
 
 ## Version
 
-Release version is tracked in two places:
+Release version is tracked in four places:
 
 - `VERSION`
 - `wails.json` at `info.productVersion`
+- `frontend/package.json`
+- `frontend/package-lock.json` at both the root `version` and `packages[""]` entry
 
 They must match. Check this before building:
 

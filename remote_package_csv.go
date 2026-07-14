@@ -145,6 +145,8 @@ func normalizePackageEcosystem(value string) string {
 		return "crates"
 	case "go", "golang", "gomod", "go modules", "go-modules":
 		return "go"
+	case "nuget", "nuget.org", "dotnet", ".net":
+		return "nuget"
 	default:
 		return strings.ToLower(strings.TrimSpace(value))
 	}
