@@ -54,7 +54,7 @@ jobs:
         run: make release-cli
 
       - name: Build macOS app
-        run: make build
+        run: make verify-app-version
 
       - name: Sign and notarize macOS app
         if: startsWith(github.ref, 'refs/tags/v')
@@ -78,7 +78,8 @@ jobs:
         run: make checksums
 
       - name: Verify checksums
-        run: shasum -a 256 -c dist/SHA256SUMS
+        working-directory: dist
+        run: shasum -a 256 -c SHA256SUMS
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7

@@ -14,7 +14,7 @@ GO_LDFLAGS ?= -s -w
 VERSION_LDFLAGS ?= -X main.buildVersion=$(VERSION) -X main.buildCommit=$(COMMIT)
 WAILS ?= $(shell command -v wails 2>/dev/null || printf "%s/go/bin/wails" "$(HOME)")
 
-.PHONY: help deps frontend-install frontend-build test build build-cli install install-cli dev version release-check release release-artifacts release-cli package-app checksums clean
+.PHONY: help deps frontend-install frontend-build test build verify-app-version build-cli install install-cli dev version release-check release release-artifacts release-cli package-app checksums clean
 .NOTPARALLEL: release release-artifacts
 
 help:
@@ -22,6 +22,7 @@ help:
 	@printf "  make deps              Install frontend dependencies\n"
 	@printf "  make test              Run Go tests and frontend production build\n"
 	@printf "  make build             Build the Wails desktop app\n"
+	@printf "  make verify-app-version Build the app and verify embedded release metadata\n"
 	@printf "  make build-cli         Build the standalone CLI binary\n"
 	@printf "  make release-check     Validate release metadata and required tools\n"
 	@printf "  make release           Build release archives and SHA-256 checksums\n"
@@ -47,7 +48,21 @@ test: frontend-build
 	go test ./...
 
 build: test
-	$(WAILS) build
+	$(WAILS) build -trimpath -ldflags "$(GO_LDFLAGS) $(VERSION_LDFLAGS)"
+
+verify-app-version: build
+	@if [[ -d "$(APP_BUNDLE)" ]]; then \
+		executable="$(abspath $(APP_BUNDLE))/Contents/MacOS/$(APP_NAME)"; \
+		expected="$(APP_NAME) $(VERSION) ($(COMMIT))"; \
+		test -x "$$executable" || { printf "App executable is missing: %s\n" "$$executable" >&2; exit 1; }; \
+		verify_dir="$$(mktemp -d)"; \
+		actual="$$(cd "$$verify_dir" && "$$executable" version)"; \
+		rmdir "$$verify_dir"; \
+		[[ "$$actual" == "$$expected" ]] || { printf "App version mismatch: expected %s, got %s\n" "$$expected" "$$actual" >&2; exit 1; }; \
+		printf "App version OK: %s\n" "$$actual"; \
+	else \
+		printf "Skipping app version check: $(APP_BUNDLE) was not produced on this platform.\n"; \
+	fi
 
 build-cli: frontend-build
 	mkdir -p build/bin
@@ -120,7 +135,7 @@ release-cli: release-check frontend-build
 		rm -rf "$$workdir"; \
 	done
 
-package-app: build
+package-app: verify-app-version
 	@if [[ -d "$(APP_BUNDLE)" ]]; then \
 		mkdir -p "$(DIST_DIR)"; \
 		archive="$(APP_NAME)_$(VERSION)_macos_app.zip"; \
@@ -133,7 +148,7 @@ package-app: build
 checksums:
 	@test -d "$(DIST_DIR)" || { printf "$(DIST_DIR) does not exist.\n" >&2; exit 1; }
 	@tmpfile="$$(mktemp)"; \
-	find "$(DIST_DIR)" -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 shasum -a 256 > "$$tmpfile"; \
+	( cd "$(DIST_DIR)" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 shasum -a 256 | sed 's#  \./#  #' ) > "$$tmpfile"; \
 	mv "$$tmpfile" "$(DIST_DIR)/SHA256SUMS"; \
 	printf "Wrote $(DIST_DIR)/SHA256SUMS\n"
 
