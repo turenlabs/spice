@@ -70,6 +70,12 @@ To build only the desktop app bundle:
 make build
 ```
 
+Release builds embed the `VERSION` and Git commit in both the standalone CLI and the Wails app executable. Validate the app executable before signing or packaging it:
+
+```bash
+make verify-app-version
+```
+
 ## Signed macOS Releases
 
 Tag builds require Apple signing and notarization secrets. Branch builds can still produce unsigned validation artifacts when those secrets are not configured.
@@ -115,10 +121,10 @@ Never commit certificate exports, private keys, App Store Connect API keys, or p
 
 ```bash
 make checksums
-shasum -a 256 -c dist/SHA256SUMS
+(cd dist && shasum -a 256 -c SHA256SUMS)
 ```
 
-Publish `SHA256SUMS` next to the release artifacts.
+Checksum entries use release asset filenames without the local `dist/` prefix, so the downloaded assets and `SHA256SUMS` verify together from one directory. Publish `SHA256SUMS` next to the release artifacts.
 
 ## Detection Pack State
 
