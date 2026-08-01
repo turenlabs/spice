@@ -42,8 +42,8 @@ Branch builds compile and upload artifacts for validation. Tag builds also creat
 Use a tag for public release publishing:
 
 ```bash
-git tag v0.1.23
-git push origin v0.1.23
+git tag v0.1.24
+git push origin v0.1.24
 ```
 
 ## Build Artifacts
@@ -135,6 +135,8 @@ Document the remote detection pack state in release notes:
 - Any detection-only updates shipped since the previous app release.
 
 For the v0.1.23 refresh, the detection catalog adds post-July 14 coverage for late-July npm/PyPI malware advisories, including the Joyfill 2773 compromise, the Pepesoft NuGet tool campaign, the `Newtonsoftt.Json.Net` NuGet typosquat, and the Alibaba-targeted npm package cluster. These are data-only updates; users should run `spice update` after installing the release.
+
+For the v0.1.24 refresh, the detection catalog adds the `pypi-anthropickit-2026-07` pack covering the `anthropickit@999.9.9` PyPI credential stealer tied to Anthropic's July 30 evaluation-incident disclosure (OSV `MAL-2026-5755`). This is a data-only update; users should run `spice update` after installing the release.
 
 Detection data can change independently from app releases. If a release fixes scanner behavior, note whether users also need to refresh detections with `spice update` or the desktop refresh action.
 
