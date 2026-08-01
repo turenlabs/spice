@@ -29,6 +29,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Verify tag version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          expected="v$(tr -d '[:space:]' < VERSION)"
+          test "$GITHUB_REF_NAME" = "$expected" || {
+            printf 'Release tag %s does not match VERSION (%s).\n' "$GITHUB_REF_NAME" "$expected" >&2
+            exit 1
+          }
+
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
@@ -108,3 +117,9 @@ jobs:
             This release includes signed and notarized macOS CLI archives, Linux CLI archives, a signed and notarized macOS app bundle, and SHA-256 checksums.
 
             Detection data is loaded from the public `turenlabs/spice-detections` pack at runtime. A clean scan is a useful signal, not proof that a system is safe.
+
+            This release refreshes coverage for late-July npm/PyPI malware advisories, including the Joyfill 2773 compromise, the Pepesoft NuGet tool campaign, the Newtonsoftt.Json.Net NuGet typosquat, and the Alibaba-targeted npm package cluster.
+
+            Refresh detection data with `spice update`. Manifest: https://api.github.com/repos/turenlabs/spice-detections/contents/manifest.json?ref=main
+
+            Spice stores scan history, findings, package inventory, settings, and detection caches locally. Detection refreshes fetch public data from GitHub and do not upload scan results.
