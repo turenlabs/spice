@@ -118,7 +118,7 @@ jobs:
 
             Detection data is loaded from the public `turenlabs/spice-detections` pack at runtime. A clean scan is a useful signal, not proof that a system is safe.
 
-            This release refreshes coverage for late-July npm/PyPI malware advisories, including the Joyfill 2773 compromise, the Pepesoft NuGet tool campaign, the Newtonsoftt.Json.Net NuGet typosquat, and the Alibaba-targeted npm package cluster.
+            This release refreshes coverage for the ChainDrop npm worm and high-confidence early-August npm/PyPI malware advisories. Detection data includes exact affected package versions, payload hashes, and campaign-specific indicators.
 
             Refresh detection data with `spice update`. Manifest: https://api.github.com/repos/turenlabs/spice-detections/contents/manifest.json?ref=main
 
