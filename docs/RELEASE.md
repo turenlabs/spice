@@ -140,6 +140,8 @@ For the v0.1.24 refresh, the detection catalog adds the `pypi-anthropickit-2026-
 
 For the v0.1.25 refresh, the detection catalog adds the `chaindrop-2026-08`, `npm-malware-2026-08`, and `pypi-malware-2026-08` packs. These cover the ChainDrop npm worm's exact affected package snapshot and payload indicators plus high-confidence early-August npm and PyPI malware advisories. This is a data-only update; users should run `spice update` after installing the release.
 
+For the v0.1.27 refresh, the existing August npm and PyPI packs add post-baseline high-confidence malware coverage, including exact package archive hashes, affected versions, campaign-specific IOCs, and composites for the RedShell, Flasq, Catbox, JSONBin, and sme-rko families. This is a data-only update; users should run `spice update` after installing the release.
+
 Detection data can change independently from app releases. If a release fixes scanner behavior, note whether users also need to refresh detections with `spice update` or the desktop refresh action.
 
 ## Privacy Note For Release Notes
