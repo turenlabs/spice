@@ -516,7 +516,7 @@ func isAlwaysScanBase(base string) bool {
 	switch {
 	case base == "package.json", base == "package-lock.json", base == "npm-shrinkwrap.json":
 		return true
-	case base == "pnpm-lock.yaml", base == "yarn.lock", base == "bun.lock", base == "bun.lockb":
+	case base == "pnpm-lock.yaml", base == "yarn.lock", base == "bun.lock":
 		return true
 	case base == "pyproject.toml", base == "poetry.lock", base == "pipfile", base == "pipfile.lock":
 		return true
@@ -592,7 +592,7 @@ func isStartupOrTokenPath(slash string) bool {
 func (s *Scanner) scanPriority(path string) int {
 	base := strings.ToLower(filepath.Base(path))
 	switch {
-	case base == "package.json", base == "package-lock.json", base == "pnpm-lock.yaml", base == "yarn.lock", isNuGetManifestBase(base):
+	case base == "package.json", base == "package-lock.json", base == "pnpm-lock.yaml", base == "yarn.lock", base == "bun.lock", isNuGetManifestBase(base):
 		return 0
 	case strings.HasPrefix(base, "requirements") && strings.HasSuffix(base, ".txt"):
 		return 1
@@ -755,12 +755,26 @@ func textCandidate(path string) bool {
 	if isNuGetManifestBase(filepath.Base(lower)) {
 		return true
 	}
-	for _, suffix := range []string{".json", ".lock", ".yaml", ".yml", ".txt", ".log", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".py", ".rs", ".toml", ".ini", ".cfg", ".conf", ".plist", ".service", ".pth", ".gyp", ".md", ".mdc"} {
+	base := filepath.Base(lower)
+	if base == "dockerfile" || strings.HasPrefix(base, "dockerfile.") {
+		return true
+	}
+	switch base {
+	case ".npmrc", ".pypirc", ".yarnrc", ".zshrc", ".zprofile", ".bashrc", ".bash_profile", ".profile":
+		return true
+	}
+	if strings.HasSuffix(filepath.ToSlash(lower), "/.config/fish/config.fish") {
+		return true
+	}
+	if separator := strings.LastIndex(lower, "!"); separator >= 0 &&
+		isPackageArchiveBase(filepath.Base(lower[:separator])) && filepath.Base(lower[separator+1:]) == "license" {
+		return true
+	}
+	for _, suffix := range []string{".json", ".lock", ".yaml", ".yml", ".txt", ".log", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".py", ".ps1", ".vbs", ".rs", ".toml", ".ini", ".cfg", ".conf", ".plist", ".service", ".pth", ".gyp", ".md", ".mdc"} {
 		if strings.HasSuffix(lower, suffix) {
 			return true
 		}
 	}
-	base := filepath.Base(lower)
 	return base == "package-lock.json" || base == "pnpm-lock.yaml" || base == "yarn.lock" || base == "metadata" || isAIAgentConfigBase(base) || strings.HasPrefix(base, "requirements")
 }
 

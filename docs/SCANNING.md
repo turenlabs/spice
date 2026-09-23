@@ -35,7 +35,7 @@ Candidate selection lives in `engine.go`.
 
 Always scan:
 
-- package manifests and lockfiles (npm, PyPI, Composer, Go, Cargo `Cargo.toml`/`Cargo.lock`, and NuGet project/props/config/lock/assets/nuspec files)
+- package manifests and lockfiles (npm, including text Bun `bun.lock` for affected-version matching; PyPI; Composer; Go; Cargo `Cargo.toml`/`Cargo.lock`; and NuGet project/props/config/lock/assets/nuspec files)
 - package archives, including NuGet `.nupkg` ZIP archives
 - Python `METADATA`
 - Dockerfiles
@@ -45,6 +45,8 @@ Always scan:
 - GitHub Actions workflow files (`.github/workflows/*.yml`/`.yaml`, via `isCIWorkflowPath`) — recurring Shai-Hulud/Miasma payload host, where a malicious `release` workflow publishes via OIDC. Presence is not suspicious; malicious workflows are gated by composite IOCs.
 - startup/token-sensitive paths
 - remote incident filenames
+
+The text IOC/composite matcher only reads recognized text candidates. In addition to supported extensions, this includes `Dockerfile` and `Dockerfile.*`, remote-pack-selected `.ps1`/`.vbs` files, extensionless `LICENSE` members inside scanned archives, and the supported startup/token files `.npmrc`, `.pypirc`, `.yarnrc`, `.zshrc`, `.zprofile`, `.bashrc`, `.bash_profile`, `.profile`, and `~/.config/fish/config.fish`. This is an explicit allowlist, not a scan of arbitrary extensionless files. Text Bun v1.2 `bun.lock` resolution keys are checked as npm package/version entries; this adds affected-version matching, not Bun-specific structured package-inventory extraction. The legacy binary `bun.lockb` format has no parser and is not selected as a normal manifest/content candidate; a broad Deep scan may still read it under the ordinary size limit, but affected-package and text IOC parsing do not decode it.
 
 Project profile scans only dependency files likely to be loaders, such as setup/install/runtime/router/token filenames, Python `.pth` files, and npm native-build `binding.gyp` files in package-cache paths. Arbitrary dependency source files stay metadata-only unless deep scan is selected.
 

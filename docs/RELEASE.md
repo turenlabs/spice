@@ -142,6 +142,8 @@ For the v0.1.25 refresh, the detection catalog adds the `chaindrop-2026-08`, `np
 
 For the v0.1.27 refresh, the existing August npm and PyPI packs add post-baseline high-confidence malware coverage, including exact package archive hashes, affected versions, campaign-specific IOCs, and composites for the RedShell, Flasq, Catbox, JSONBin, and sme-rko families. This is a data-only update; users should run `spice update` after installing the release.
 
+For the v0.1.28 refresh, the detection catalog adds the August crates.io build-script compromise, the Equation of Compromise npm campaign, and the confirmed Twilio-themed npm probe releases. The scanner also adds affected-version matching for text Bun lockfiles and enables IOC matching in Dockerfiles, startup/token text files, and selected script or archive artifacts. Legacy binary `bun.lockb` remains unsupported. Users should run `spice update` after installing the release.
+
 Detection data can change independently from app releases. If a release fixes scanner behavior, note whether users also need to refresh detections with `spice update` or the desktop refresh action.
 
 ## Privacy Note For Release Notes

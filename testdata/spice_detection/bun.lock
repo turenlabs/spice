@@ -1,0 +1,20 @@
+// Text lockfile format emitted by Bun v1.2.
+{
+  "lockfileVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "bun-lock-fixture-app",
+      "dependencies": {
+        "bun-lock-fixture": "^2.4.0"
+      }
+    }
+  },
+  "packages": {
+    "bun-lock-fixture@2.4.6": [
+      "bun-lock-fixture@2.4.6",
+      "",
+      {},
+      "sha512-dGVzdC1pbnRlZ3JpdHktb25seQ=="
+    ]
+  }
+}

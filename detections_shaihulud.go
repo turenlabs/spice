@@ -146,7 +146,7 @@ func (d *MiniShaiHuludDetection) ScanFile(file FileContext, emit EmitFinding) {
 		d.scanPackageJSON(file, emit)
 	case base == "package-lock.json":
 		d.scanPackageLock(file, emit)
-	case base == "pnpm-lock.yaml", base == "yarn.lock", base == "poetry.lock", base == "pyproject.toml", base == "npm-shrinkwrap.json", base == "pipfile.lock", base == "uv.lock", base == "pdm.lock", base == "composer.json", base == "composer.lock", base == "go.mod", base == "cargo.toml", base == "cargo.lock":
+	case base == "pnpm-lock.yaml", base == "yarn.lock", base == "bun.lock", base == "poetry.lock", base == "pyproject.toml", base == "npm-shrinkwrap.json", base == "pipfile.lock", base == "uv.lock", base == "pdm.lock", base == "composer.json", base == "composer.lock", base == "go.mod", base == "cargo.toml", base == "cargo.lock":
 		d.scanTextManifest(file, emit)
 	case base == "metadata":
 		d.scanPythonMetadata(file, emit)
@@ -661,7 +661,7 @@ func (d *MiniShaiHuludDetection) scanArchiveMember(archivePath, memberName strin
 		d.scanPackageJSON(member, emit)
 	case lowerBase == "metadata":
 		d.scanPythonMetadata(member, emit)
-	case lowerBase == "composer.json", lowerBase == "composer.lock", lowerBase == "package-lock.json", lowerBase == "npm-shrinkwrap.json", lowerBase == "pnpm-lock.yaml", lowerBase == "yarn.lock", lowerBase == "poetry.lock", lowerBase == "pyproject.toml", lowerBase == "pipfile.lock", lowerBase == "uv.lock", lowerBase == "pdm.lock", lowerBase == "cargo.toml", lowerBase == "cargo.lock":
+	case lowerBase == "composer.json", lowerBase == "composer.lock", lowerBase == "package-lock.json", lowerBase == "npm-shrinkwrap.json", lowerBase == "pnpm-lock.yaml", lowerBase == "yarn.lock", lowerBase == "bun.lock", lowerBase == "poetry.lock", lowerBase == "pyproject.toml", lowerBase == "pipfile.lock", lowerBase == "uv.lock", lowerBase == "pdm.lock", lowerBase == "cargo.toml", lowerBase == "cargo.lock":
 		d.scanTextManifest(member, emit)
 	default:
 		if strings.HasPrefix(lowerBase, "requirements") && strings.HasSuffix(lowerBase, ".txt") {
@@ -880,7 +880,7 @@ func mergeEcosystemVersionMaps(base, overlay map[string]map[string]map[string]bo
 func manifestEcosystem(file FileContext) string {
 	base := strings.ToLower(file.Base)
 	switch base {
-	case "package.json", "package-lock.json", "npm-shrinkwrap.json", "pnpm-lock.yaml", "yarn.lock":
+	case "package.json", "package-lock.json", "npm-shrinkwrap.json", "pnpm-lock.yaml", "yarn.lock", "bun.lock":
 		return "npm"
 	case "pyproject.toml", "poetry.lock", "pipfile.lock", "uv.lock", "pdm.lock", "metadata":
 		return "pypi"
