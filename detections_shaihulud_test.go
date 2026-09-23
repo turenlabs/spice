@@ -112,6 +112,85 @@ func TestComposerLockAffectedPackage(t *testing.T) {
 	assertFinding(t, dedupeFindings(findings), "affected-package", "intercom/intercom-php@5.0.2 in text manifest/lockfile")
 }
 
+func TestRemoteIOCMatchesExtensionlessLicenseMembersInPackageArchives(t *testing.T) {
+	var archive bytes.Buffer
+	writer := zip.NewWriter(&archive)
+	member, err := writer.Create("LICENSE")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := member.Write([]byte("REDISTRIBUTION REQUIRES INCLUSION OF THIS LICENSE.\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	pack := &RemoteDetectionPack{
+		ID:       "equation-license-marker-test",
+		Campaign: "Equation of Compromise IOC test",
+		IOCs: []RemoteIOC{{
+			Label:    "Equation of Compromise LICENSE infection marker",
+			Severity: "high",
+			Pattern:  `REDISTRIBUTION REQUIRES INCLUSION OF THIS LICENSE\.`,
+		}},
+	}
+	detection := NewMiniShaiHuludDetectionWithRemote(pack)
+	var findings []Finding
+	detection.ScanFile(FileContext{
+		Path:  "package.zip",
+		Base:  "package.zip",
+		Slash: "package.zip",
+		Data:  archive.Bytes(),
+	}, func(finding Finding) {
+		findings = append(findings, finding)
+	})
+	assertSeverityFinding(t, findings, "high", "ioc-string", "Equation of Compromise LICENSE infection marker")
+}
+
+func TestBunTextLockMatchesExactAffectedNPMVersion(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("testdata", "spice_detection", "bun.lock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const packageName, affectedVersion = "bun-lock-fixture", "2.4.6"
+	pack := &RemoteDetectionPack{
+		ID:       "bun-lock-test",
+		Campaign: "Bun text lock test",
+		AffectedVersionsByEcosystem: map[string]map[string]map[string]bool{
+			"npm": {packageName: {affectedVersion: true}},
+		},
+	}
+
+	if got := manifestEcosystem(FileContext{Base: "bun.lock"}); got != "npm" {
+		t.Fatalf("manifestEcosystem(bun.lock) = %q, want npm", got)
+	}
+	if !textCandidate("bun.lock") {
+		t.Fatal("text bun.lock should remain a text candidate")
+	}
+	if got := classifyScanFile(filepath.Join("repo", "bun.lock"), 128, nil); got != scanContent {
+		t.Fatalf("classifyScanFile(bun.lock) = %v, want scanContent", got)
+	}
+
+	findings := scanBunLockData(t, data, pack)
+	assertFinding(t, findings, "affected-package", packageName+"@"+affectedVersion+" in text manifest/lockfile")
+
+	// A neighboring version throughout Bun's lockfile must not be accepted as an exact affected version.
+	nearbyVersionData := []byte(strings.ReplaceAll(string(data), affectedVersion, affectedVersion+"0"))
+	findings = scanBunLockData(t, nearbyVersionData, pack)
+	assertNoKind(t, findings, "affected-package")
+}
+
+func scanBunLockData(t *testing.T, data []byte, pack *RemoteDetectionPack) []Finding {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "bun.lock")
+	detection := NewMiniShaiHuludDetectionWithRemote(pack)
+	var findings []Finding
+	detection.ScanFile(FileContext{Path: path, Base: filepath.Base(path), Slash: filepath.ToSlash(path), Data: data}, func(finding Finding) {
+		findings = append(findings, finding)
+	})
+	return dedupeFindings(findings)
+}
+
 func TestLaravelLangComposerLockAffectedPackage(t *testing.T) {
 	detection := NewMiniShaiHuludDetectionWithRemote(&RemoteDetectionPack{
 		ID:       "laravel-lang-2026-05",
@@ -655,6 +734,88 @@ func TestRepoOpenExecutionPathsAreContentScanned(t *testing.T) {
 	}
 	if got := classifyScanFile("repo/.github/ordinary.js", 2048, nil); got != scanMetadataOnly {
 		t.Fatalf("ordinary .github JS should remain metadata-only: got %v", got)
+	}
+}
+
+func TestRemoteIOCMatchesDockerfilesAndSupportedStartupTokenTextFiles(t *testing.T) {
+	home := t.TempDir()
+	paths := []string{
+		filepath.Join(home, "Dockerfile"),
+		filepath.Join(home, "Dockerfile.dev"),
+		filepath.Join(home, "rust-setup.ps1"),
+		filepath.Join(home, "rust-setup-launch.vbs"),
+		filepath.Join(home, ".npmrc"),
+		filepath.Join(home, ".pypirc"),
+		filepath.Join(home, ".yarnrc"),
+		filepath.Join(home, ".zshrc"),
+		filepath.Join(home, ".zprofile"),
+		filepath.Join(home, ".bashrc"),
+		filepath.Join(home, ".bash_profile"),
+		filepath.Join(home, ".profile"),
+		filepath.Join(home, ".config", "fish", "config.fish"),
+	}
+	suspicious := map[string]bool{
+		"rust-setup.ps1":        true,
+		"rust-setup-launch.vbs": true,
+	}
+	pack := &RemoteDetectionPack{
+		ID:       "supported-text-context-test",
+		Campaign: "Supported text context IOC test",
+		IOCs: []RemoteIOC{{
+			Label:    "test IOC in supported text context",
+			Severity: "high",
+			Pattern:  `SPICE_SUPPORTED_CONTEXT_IOC`,
+		}},
+	}
+	detection := NewMiniShaiHuludDetectionWithRemote(pack)
+
+	for _, path := range paths {
+		t.Run(filepath.Base(path), func(t *testing.T) {
+			if !textCandidate(path) {
+				t.Fatalf("%q should be a text candidate", path)
+			}
+			if got := classifyScanFile(path, 128, suspicious); got != scanContent {
+				t.Fatalf("classifyScanFile(%q) = %v, want scanContent", path, got)
+			}
+			if got := classifyShaiHuludVectorFile(path, 128, suspicious); got != scanContent {
+				t.Fatalf("classifyShaiHuludVectorFile(%q) = %v, want scanContent", path, got)
+			}
+			if isStartupOrTokenPath(strings.ToLower(filepath.ToSlash(path))) {
+				startupScanner := &Scanner{profile: ScanProfileStartup}
+				if got := startupScanner.classifyScanFile(path, 128); got != scanContent {
+					t.Fatalf("startup classifyScanFile(%q) = %v, want scanContent", path, got)
+				}
+			}
+			var findings []Finding
+			detection.ScanFile(FileContext{
+				Path:  path,
+				Base:  filepath.Base(path),
+				Slash: filepath.ToSlash(path),
+				Data:  []byte("# SPICE_SUPPORTED_CONTEXT_IOC\n"),
+			}, func(finding Finding) {
+				findings = append(findings, finding)
+			})
+			assertSeverityFinding(t, findings, "high", "ioc-string", "test IOC in supported text context")
+		})
+	}
+
+	for _, path := range []string{filepath.Join(home, "Dockerfileish"), filepath.Join(home, "ordinary-extensionless-file")} {
+		if textCandidate(path) {
+			t.Errorf("unlisted file %q should not become a text candidate", path)
+		}
+		if got := classifyScanFile(path, 128, nil); got != scanMetadataOnly {
+			t.Errorf("classifyScanFile(%q) = %v, want scanMetadataOnly", path, got)
+		}
+	}
+	if textCandidate(filepath.Join(home, "bun.lockb")) {
+		t.Fatal("binary bun.lockb should not be considered a text candidate")
+	}
+	binaryLockPath := filepath.Join(home, "bun.lockb")
+	if got := classifyScanFile(binaryLockPath, 128, nil); got != scanMetadataOnly {
+		t.Fatalf("classifyScanFile(bun.lockb) = %v, want scanMetadataOnly", got)
+	}
+	if got := classifyShaiHuludVectorFile(binaryLockPath, 128, nil); got != scanMetadataOnly {
+		t.Fatalf("classifyShaiHuludVectorFile(bun.lockb) = %v, want scanMetadataOnly", got)
 	}
 }
 

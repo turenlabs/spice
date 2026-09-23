@@ -118,7 +118,7 @@ jobs:
 
             Detection data is loaded from the public `turenlabs/spice-detections` pack at runtime. A clean scan is a useful signal, not proof that a system is safe.
 
-            This release refreshes coverage for the ChainDrop npm worm and high-confidence early-August npm/PyPI malware advisories. Detection data includes exact affected package versions, payload hashes, and campaign-specific indicators.
+            This release adds high-confidence coverage for the August crates.io build-script compromise, the Equation of Compromise npm campaign, and confirmed Twilio-themed npm probe releases. It also fixes IOC matching for Dockerfiles and startup/token text files and adds affected-version matching for text Bun lockfiles.
 
             Refresh detection data with `spice update`. Manifest: https://api.github.com/repos/turenlabs/spice-detections/contents/manifest.json?ref=main
 
